@@ -1,0 +1,49 @@
+# EPB detector — local / VPS deployment.
+#
+# Two services share a single named volume so both processes see the same
+# manifest, parquets, and pyOASIS outputs in real time.
+#
+# - `api` exposes FastAPI on host port 8000 (bound to 127.0.0.1 by default in
+#   the override file; flip to 0.0.0.0 only if you intend to expose publicly).
+# - `ingest` runs `epb ingest phase2a` once and exits. Restart with
+#   `docker compose run --rm ingest` to continue (it skips already-done jobs).
+#
+# IMPORTANT: nothing here references a specific host or IP — keep it that way
+# so the file stays committable. Use `compose.override.yml` for host-specific
+# tweaks (gitignored).
+
+name: epb
+
+services:
+  api:
+    image: epb-detector:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: epb-api
+    restart: unless-stopped
+    command: ["uvicorn", "services.api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - epb_data:/data
+    environment:
+      EPB_INGEST_WORKERS: "1"
+
+  ingest:
+    image: epb-detector:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: epb-ingest
+    profiles: ["work"]      # only starts when `--profile work` is passed
+    command: ["python", "-m", "epb_detector.cli", "ingest", "phase2a"]
+    volumes:
+      - epb_data:/data
+    environment:
+      EPB_INGEST_WORKERS: "3"
+      MPLBACKEND: "Agg"
+
+volumes:
+  epb_data:
+    name: epb_data

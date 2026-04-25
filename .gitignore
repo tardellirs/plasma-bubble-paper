@@ -57,6 +57,10 @@ test-results/
 # Claude Code local state
 .claude/
 
+# Host-specific docker overrides (may carry hostnames or secrets)
+docker/compose.override.yml
+docker/.env
+
 # Data files
 *.zip
 *.tar
