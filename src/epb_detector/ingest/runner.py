@@ -25,7 +25,7 @@ from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-from epb_detector.config import SETTINGS  # noqa: E402
+from epb_detector.config import SETTINGS
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ def run_pyoasis_pipeline(sta: str, year: int, doy: int) -> dict[str, object]:
         try:
             pyOASIS.TECcalc(sta, f"{doy:03d}", str(year), sta_out, sta_out, show_plot=False)
             executed.append("TECcalc")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             (sta_out / "TECcalc.error.txt").write_text(repr(e))
             executed.append("TECcalc(failed)")
 
