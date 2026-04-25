@@ -1,13 +1,24 @@
 /**
  * Thin client for the EPB detector FastAPI service.
  *
- * In production, the Next.js app proxies `/api/*` to the private FastAPI
- * container (see `next.config.mjs` rewrites). For local dev, set
- * `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local` to bypass
- * the proxy and hit the API directly.
+ * Two paths depending on where fetch runs:
+ *
+ * - **Browser (CSR)**: relative `/api/*` — Next.js rewrites in
+ *   `next.config.mjs` proxy to the private FastAPI container.
+ * - **Server (SSR / RSC)**: absolute URL is required by Node's `fetch`.
+ *   We use `API_INTERNAL_URL` (default `http://epb-api:8000`, suitable
+ *   for the docker-compose stack) so the page never goes back through
+ *   the public Traefik path on render.
+ *
+ * `NEXT_PUBLIC_API_URL` overrides the browser default — set it in
+ * `.env.local` to point straight at a local API for dev.
  */
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+const IS_SERVER = typeof window === "undefined";
+
+export const API_BASE = IS_SERVER
+  ? process.env.API_INTERNAL_URL ?? "http://localhost:8000"
+  : process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export type Station = {
   id: string;
