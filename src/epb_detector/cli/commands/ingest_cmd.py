@@ -51,16 +51,32 @@ def list_jobs() -> None:
 
 
 @app.command("phase2a")
-def run_phase2a(force: bool = False) -> None:
+def run_phase2a(
+    force: bool = False,
+    skip: str = typer.Option(
+        "",
+        "--skip",
+        help="Comma-separated station IDs to exclude (e.g. BOAV,POAL).",
+    ),
+) -> None:
     """Run the Phase 2-A preset (8 stations × ~60 days, Sep 2023 → May 2024)."""
-    jobs = jobs_from_phase2a()
-    rprint(f"[bold]Phase 2-A[/]: {len(jobs)} station-days "
-           f"({len(phase2a_stations())} stations × {len(phase2a_days())} days)")
+    skip_set = {s.strip().upper() for s in skip.split(",") if s.strip()}
+    all_jobs = jobs_from_phase2a()
+    jobs = [j for j in all_jobs if j.sta not in skip_set]
+    if skip_set:
+        rprint(
+            f"[yellow]Skipping[/] stations: {sorted(skip_set)}  "
+            f"(removed {len(all_jobs) - len(jobs)} jobs)"
+        )
+    rprint(
+        f"[bold]Phase 2-A[/]: {len(jobs)} station-days  "
+        f"({len({j.sta for j in jobs})} stations × {len({(j.year, j.doy) for j in jobs})} days)"
+    )
     recs = run_jobs(jobs, force=force)
     ok = sum(r.status == "ok" for r in recs)
     fail = sum(r.status == "failed" for r in recs)
-    skip = sum(r.status == "skipped" for r in recs)
-    rprint(f"[bold]Done[/]: ok={ok} failed={fail} skipped={skip} total={len(recs)}")
+    skipped_count = sum(r.status == "skipped" for r in recs)
+    rprint(f"[bold]Done[/]: ok={ok} failed={fail} skipped={skipped_count} total={len(recs)}")
 
 
 @app.command("status")
