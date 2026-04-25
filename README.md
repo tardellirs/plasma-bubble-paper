@@ -39,9 +39,6 @@ Released under CC BY-NC 4.0 (same as upstream OASIS). See `LICENSE`.
 
 ---
 
-<p align="center">
-  <img src="img/logo_bar.png" alt="OASIS Logo" width="900"/>
-</p>
 
 # OASIS: Open-Access System for Ionospheric Studies
 
