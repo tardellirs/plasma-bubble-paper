@@ -1,10 +1,13 @@
 /**
  * Thin client for the EPB detector FastAPI service.
- * Configure with NEXT_PUBLIC_API_URL (default: http://localhost:8000).
+ *
+ * In production, the Next.js app proxies `/api/*` to the private FastAPI
+ * container (see `next.config.mjs` rewrites). For local dev, set
+ * `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local` to bypass
+ * the proxy and hit the API directly.
  */
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
 export type Station = {
   id: string;

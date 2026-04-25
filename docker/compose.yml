@@ -1,15 +1,17 @@
 # EPB detector — local / VPS deployment.
 #
-# Two services share a single named volume so both processes see the same
+# Three services share a single named volume so all processes see the same
 # manifest, parquets, and pyOASIS outputs in real time.
 #
-# - `api` exposes FastAPI on host port 8000 (bound to 127.0.0.1 by default in
-#   the override file; flip to 0.0.0.0 only if you intend to expose publicly).
+# - `api` exposes FastAPI on host port 8000 (bound to 127.0.0.1 — never
+#   public; the web app reaches it over the internal docker network).
+# - `web` runs the Next.js frontend, picked up by Traefik via labels and
+#   served at the configured `WEB_HOST` (default: plasma-bubble.ifsp.dev).
 # - `ingest` runs `epb ingest phase2a` once and exits. Restart with
 #   `docker compose run --rm ingest` to continue (it skips already-done jobs).
 #
-# IMPORTANT: nothing here references a specific host or IP — keep it that way
-# so the file stays committable. Use `compose.override.yml` for host-specific
+# IMPORTANT: nothing here references a specific host or IP that wouldn't
+# round-trip via env vars. Use `compose.override.yml` for host-specific
 # tweaks (gitignored).
 
 name: epb
@@ -30,6 +32,31 @@ services:
     environment:
       EPB_INGEST_WORKERS: "1"
 
+  web:
+    image: epb-web:latest
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: epb-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      # Server-side proxy target (also used by /api rewrites in Next).
+      API_INTERNAL_URL: "http://epb-api:8000"
+      # Client-side fetches go through the rewrites → no public 8000 leak.
+      NEXT_PUBLIC_API_URL: "/api"
+    networks:
+      default:
+      dokploy-network:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.epb-web.rule=Host(`${WEB_HOST:-plasma-bubble.ifsp.dev}`)"
+      - "traefik.http.routers.epb-web.entrypoints=websecure"
+      - "traefik.http.routers.epb-web.tls=true"
+      - "traefik.http.routers.epb-web.tls.certresolver=le"
+      - "traefik.http.services.epb-web.loadbalancer.server.port=3000"
+
   ingest:
     image: epb-detector:latest
     build:
@@ -43,6 +70,13 @@ services:
     environment:
       EPB_INGEST_WORKERS: "3"
       MPLBACKEND: "Agg"
+
+networks:
+  default:
+    name: epb_default
+  dokploy-network:
+    external: true
+    name: dokploy-network
 
 volumes:
   epb_data:
