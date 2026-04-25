@@ -37,6 +37,12 @@ WDC_DST_PROVISIONAL_URL = (
     "https://wdc.kugi.kyoto-u.ac.jp/dst_provisional/{yyyymm}/index.html"
 )
 WDC_DST_FINAL_URL = "https://wdc.kugi.kyoto-u.ac.jp/dst_final/{yyyymm}/index.html"
+# WDC publishes Dst in three layers: final (definitive, ~1 year lag),
+# provisional (~3 month lag), real-time (current month + a few back).
+# We try them in that order so the most accurate available value wins.
+WDC_DST_REALTIME_URL = (
+    "https://wdc.kugi.kyoto-u.ac.jp/dst_realtime/{yyyymm}/index.html"
+)
 
 
 @dataclass(slots=True)
@@ -165,7 +171,7 @@ def fetch_dst(start: datetime, end: datetime, force: bool = False) -> FetchResul
 
     pieces: list[pd.DataFrame] = [existing] if not existing.empty else []
     for yyyymm in missing:
-        for tmpl in (WDC_DST_FINAL_URL, WDC_DST_PROVISIONAL_URL):
+        for tmpl in (WDC_DST_FINAL_URL, WDC_DST_PROVISIONAL_URL, WDC_DST_REALTIME_URL):
             url = tmpl.format(yyyymm=yyyymm)
             try:
                 raw = _request(url, timeout=30).decode("ascii", errors="replace")
