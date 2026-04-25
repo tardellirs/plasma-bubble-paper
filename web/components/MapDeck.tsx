@@ -11,9 +11,44 @@ type Props = {
   stations: Station[];
 };
 
-// Free demo style hosted by MapLibre. Avoids any token requirement; in
-// production we'll switch to Protomaps PMTiles for offline-style basemap.
-const STYLE_URL = "https://demotiles.maplibre.org/style.json";
+// Self-contained dark style — raster tiles from OSM with a dark filter
+// applied via a synthetic overlay. We avoid demotiles.maplibre.org because
+// it aborts under React StrictMode double-mounts and renders blank.
+const MAP_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: [
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#0a0e1a" },
+    },
+    {
+      id: "osm",
+      type: "raster",
+      source: "osm",
+      paint: {
+        "raster-opacity": 0.55,
+        "raster-saturation": -0.6,
+        "raster-contrast": -0.05,
+        "raster-brightness-min": 0.0,
+        "raster-brightness-max": 0.7,
+      },
+    },
+  ],
+};
 
 export default function MapDeck({ events, stations }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -37,17 +72,20 @@ export default function MapDeck({ events, stations }: Props) {
     if (!ref.current) return;
     const map = new maplibregl.Map({
       container: ref.current,
-      style: STYLE_URL,
+      style: MAP_STYLE,
       center: [-50, -10],
       zoom: 3.6,
       pitch: 0,
-      attributionControl: { compact: true },
+      attributionControl: { compact: true } as never,
     });
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
     mapRef.current = map;
 
     map.on("load", () => {
+      // Some browsers report the container size as 0 on the first paint
+      // before CSS settles; nudge MapLibre to re-measure.
+      map.resize();
       // Stations source
       map.addSource("stations", {
         type: "geojson",
@@ -84,22 +122,19 @@ export default function MapDeck({ events, stations }: Props) {
           "circle-stroke-color": "#FAFAFC",
         },
       });
-      map.addLayer({
-        id: "stations-labels",
-        source: "stations",
-        type: "symbol",
-        layout: {
-          "text-field": ["get", "id"],
-          "text-size": 11,
-          "text-offset": [0, 1.1],
-          "text-anchor": "top",
-          "text-allow-overlap": true,
-        },
-        paint: {
-          "text-color": "#FAFAFC",
-          "text-halo-color": "#0a0e1a",
-          "text-halo-width": 1.2,
-        },
+      // Station labels render as HTML overlay markers (see below) — symbol
+      // layers would need a `glyphs` endpoint, which we avoid to keep the
+      // basemap dependency-free.
+      stations.forEach((s) => {
+        const el = document.createElement("div");
+        el.className =
+          "px-2 py-0.5 rounded-md text-[11px] font-mono text-white " +
+          "bg-[#0a0e1a]/85 border border-[#1c2236] shadow-md pointer-events-none " +
+          "whitespace-nowrap select-none";
+        el.textContent = s.id;
+        new maplibregl.Marker({ element: el, offset: [0, 14] })
+          .setLngLat([s.geodetic_lon_deg, s.geodetic_lat_deg])
+          .addTo(map);
       });
 
       // Events source
@@ -216,8 +251,13 @@ export default function MapDeck({ events, stations }: Props) {
   }, [events, tCursor]);
 
   return (
-    <div className="relative h-full">
-      <div ref={ref} className="absolute inset-0" />
+    <div className="relative h-full w-full">
+      {/*
+        maplibre-gl.css forces `position: relative` on the container, which
+        overrides Tailwind's `absolute inset-0` and collapses the div to
+        zero height. Use explicit h-full/w-full instead.
+      */}
+      <div ref={ref} className="h-full w-full" />
 
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
         <div className="card pointer-events-auto p-4 max-w-md">
