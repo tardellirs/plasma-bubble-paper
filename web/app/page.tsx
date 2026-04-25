@@ -68,28 +68,43 @@ export default async function Home() {
   return (
     <div className="gradient-radial">
       <section className="max-w-6xl mx-auto px-6 pt-16 pb-24">
-        <div className="fade-up">
-          <p className="font-mono text-xs text-[var(--accent)] tracking-[0.2em] uppercase">
-            Open scientific platform · v0.1
-          </p>
-          <h1 className="font-display text-5xl md:text-6xl font-semibold leading-[1.05] mt-4 max-w-3xl">
-            Equatorial plasma bubbles,{" "}
-            <span className="text-[var(--accent)]">automatically detected</span>{" "}
-            from GNSS.
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg text-[var(--fg-muted)]">
-            Bulk ingest, leveling, ROTI / ΔTEC / SIDX index synthesis, weak-label
-            heuristics calibrated against the Pi (1997) and Cherniak et&nbsp;al.
-            (2014) literature, an XGBoost baseline, and a full audit trail —
-            ready for paper figures and conference plots.
-          </p>
-          <div className="mt-8 flex gap-3">
-            <Link href="/map" className="btn btn-primary">
-              Explore the live map →
-            </Link>
-            <Link href="/dataset" className="btn btn-ghost">
-              Inspect the dataset
-            </Link>
+        <div className="fade-up grid gap-10 md:grid-cols-[1fr_320px] items-center">
+          <div>
+            <p className="font-mono text-xs text-[var(--accent)] tracking-[0.2em] uppercase">
+              Open scientific platform · v0.1
+            </p>
+            <h1 className="font-display text-5xl md:text-6xl font-semibold leading-[1.05] mt-4">
+              Equatorial plasma bubbles,{" "}
+              <span className="text-[var(--accent)]">automatically detected</span>{" "}
+              from GNSS.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg text-[var(--fg-muted)]">
+              Bulk ingest, leveling, ROTI / ΔTEC / SIDX index synthesis, weak-label
+              heuristics calibrated against the Pi (1997) and Cherniak et&nbsp;al.
+              (2014) literature, an XGBoost baseline, and a full audit trail —
+              ready for paper figures and conference plots.
+            </p>
+            <div className="mt-8 flex gap-3">
+              <Link href="/map" className="btn btn-primary">
+                Explore the live map →
+              </Link>
+              <Link href="/dataset" className="btn btn-ghost">
+                Inspect the dataset
+              </Link>
+            </div>
+          </div>
+          <div className="hidden md:flex justify-center">
+            <picture>
+              <source srcSet="/mark-256.webp" type="image/webp" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/mark-128.png"
+                alt="EPB Detector globe mark with neon ring and bubble markers"
+                width={280}
+                height={280}
+                className="w-[280px] h-[280px] drop-shadow-[0_0_40px_rgba(15,163,177,0.25)]"
+              />
+            </picture>
           </div>
         </div>
 

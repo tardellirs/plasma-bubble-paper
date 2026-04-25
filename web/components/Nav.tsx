@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const links = [
@@ -16,10 +17,18 @@ export function Nav() {
           className="flex items-center gap-3 group"
           aria-label="EPB Detector home"
         >
-          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/40">
-            <span className="absolute inset-0 rounded-full bg-[var(--accent)]/20 animate-ping" />
-            <span className="relative h-2 w-2 rounded-full bg-[var(--accent)]" />
-          </span>
+          <picture>
+            <source srcSet="/mark-128.webp" type="image/webp" />
+            <Image
+              src="/mark-128.png"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full ring-1 ring-[var(--accent)]/30 group-hover:ring-[var(--accent)]/70 transition"
+              priority
+              unoptimized
+            />
+          </picture>
           <span className="font-display text-base font-semibold tracking-tight">
             epb<span className="text-[var(--accent)]">.</span>detector
           </span>
