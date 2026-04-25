@@ -41,6 +41,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: "production"
+      # Bind to all interfaces — the container is attached to two docker
+      # networks (epb_default for the API, dokploy-network for Traefik) and
+      # must accept connections on both. Next standalone defaults to
+      # `localhost` on some builds, which 502s under Traefik.
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
       # Server-side proxy target (also used by /api rewrites in Next).
       API_INTERNAL_URL: "http://epb-api:8000"
       # Client-side fetches go through the rewrites → no public 8000 leak.
