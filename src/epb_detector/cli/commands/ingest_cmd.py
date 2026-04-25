@@ -7,8 +7,8 @@ from typing import Annotated
 import typer
 from rich import print as rprint
 
-from epb_detector.catalog.day_selector import mvp_days, phase2a_days
-from epb_detector.catalog.stations import get_station, mvp_stations, phase2a_stations
+from epb_detector.catalog.day_selector import mvp_days
+from epb_detector.catalog.stations import get_station, mvp_stations
 from epb_detector.ingest import cache as ingest_cache
 from epb_detector.ingest.orchestrator import (
     IngestJob,
