@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and logs
+*.log
+*.tmp
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+.venv_*/
+.env/
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Pipeline outputs
+OUTPUT/
+INPUT/RINEX/
+INPUT/ORBITS/
+
+# Data files
+*.zip
+*.tar
+*.gz
+*.nc
+*.h5
+*.shp
+*.dbf
+*.shx
+
+# System files
+.DS_Store
+Thumbs.db
