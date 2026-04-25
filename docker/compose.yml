@@ -69,13 +69,25 @@ services:
       context: ..
       dockerfile: Dockerfile
     container_name: epb-ingest
-    profiles: ["work"]      # only starts when `--profile work` is passed
+    # Don't restart on OOM/crash — bulk ingest must be deterministic. If
+    # one job blows up, the manifest already records the failure and the
+    # next run skips it. Infinite restart loops mask real OOMs.
+    restart: "no"
+    profiles: ["work"]
     command: ["python", "-m", "epb_detector.cli", "ingest", "phase2a"]
     volumes:
       - epb_data:/data
     environment:
+      # Each pyOASIS worker peaks around 2.0-2.5 GiB; 3 workers fits the
+      # 15 GiB VPS with margin. Bump only when the container has headroom.
       EPB_INGEST_WORKERS: "3"
       MPLBACKEND: "Agg"
+    mem_limit: 9g
+    memswap_limit: 9g
+    deploy:
+      resources:
+        limits:
+          memory: 9G
 
 networks:
   default:
