@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 const links = [
@@ -17,18 +16,10 @@ export function Nav() {
           className="flex items-center gap-3 group"
           aria-label="EPB Detector home"
         >
-          <picture>
-            <source srcSet="/mark-128.webp" type="image/webp" />
-            <Image
-              src="/mark-128.png"
-              alt=""
-              width={36}
-              height={36}
-              className="h-9 w-9 rounded-full ring-1 ring-[var(--accent)]/30 group-hover:ring-[var(--accent)]/70 transition"
-              priority
-              unoptimized
-            />
-          </picture>
+          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/40">
+            <span className="absolute inset-0 rounded-full bg-[var(--accent)]/20 animate-ping" />
+            <span className="relative h-2 w-2 rounded-full bg-[var(--accent)]" />
+          </span>
           <span className="font-display text-base font-semibold tracking-tight">
             epb<span className="text-[var(--accent)]">.</span>detector
           </span>
@@ -46,7 +37,7 @@ export function Nav() {
           ))}
           <a
             className="btn btn-ghost ml-2 text-xs"
-            href="https://github.com/giorgiopicanco/OASIS"
+            href="https://github.com/tardellirs/plasma-bubble-paper"
             target="_blank"
             rel="noreferrer"
           >
