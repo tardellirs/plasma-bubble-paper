@@ -11,7 +11,7 @@ import pandas as pd
 from epb_detector.geo import coords, magnetic
 
 
-def _ts_to_naive_utc_datetime(ts: pd.Timestamp) -> "pd.Timestamp":
+def _ts_to_naive_utc_datetime(ts: pd.Timestamp) -> pd.Timestamp:
     if ts.tzinfo is not None:
         ts = ts.tz_convert(timezone.utc).tz_localize(None)
     # Drop sub-second precision to keep aacgmv2 (which expects datetime, not
@@ -66,5 +66,5 @@ def geometric_features(
         "ipp_lat_mean": float(latitude_deg.mean()),
         "qd_lat_mean": _nanmean_quiet(np.asarray(qd_lat)),
         "local_time_mean": _nanmean_quiet(np.asarray(lt)),
-        "n_samples": int(len(times)),
+        "n_samples": len(times),
     }

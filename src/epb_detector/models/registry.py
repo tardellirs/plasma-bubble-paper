@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 
 from epb_detector.config import SETTINGS
 

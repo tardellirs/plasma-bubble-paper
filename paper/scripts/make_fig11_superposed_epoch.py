@@ -20,9 +20,9 @@ import pandas as pd
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-from _style import COLORS, use  # noqa: E402
+from _style import COLORS, use
 
-from epb_detector.config import SETTINGS  # noqa: E402
+from epb_detector.config import SETTINGS
 
 FIG_DIR = SETTINGS.paths.paper_figures
 MANIFEST = FIG_DIR / "manifest.json"

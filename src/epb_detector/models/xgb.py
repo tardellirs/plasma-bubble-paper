@@ -85,7 +85,7 @@ def _git_sha() -> str:
             check=True,
         )
         return out.stdout.strip()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "nogit"
 
 

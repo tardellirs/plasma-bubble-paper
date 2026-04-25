@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import duckdb
-import pandas as pd
 from fastapi import APIRouter, Query
 
 from epb_detector.config import SETTINGS

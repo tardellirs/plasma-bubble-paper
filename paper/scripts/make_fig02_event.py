@@ -22,10 +22,10 @@ import pandas as pd
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-from _style import COLORS, constellation_color, use  # noqa: E402
+from _style import COLORS, constellation_color, use
 
-from epb_detector.config import SETTINGS  # noqa: E402
-from epb_detector.io import readers  # noqa: E402
+from epb_detector.config import SETTINGS
+from epb_detector.io import readers
 
 REPO = SETTINGS.paths.repo_root
 FIG_DIR = SETTINGS.paths.paper_figures
@@ -56,7 +56,7 @@ def _load_station_day(station: str, year: int, doy: int) -> dict[str, pd.DataFra
     return out
 
 
-def _shaded_night(ax: "plt.Axes", t0: pd.Timestamp, t1: pd.Timestamp, lon_deg: float) -> None:
+def _shaded_night(ax: plt.Axes, t0: pd.Timestamp, t1: pd.Timestamp, lon_deg: float) -> None:
     """Shade the local-time night band 19h–06h for context."""
     one_day = pd.Timedelta(days=1)
     cursor = pd.Timestamp(t0).normalize() - one_day
@@ -68,7 +68,7 @@ def _shaded_night(ax: "plt.Axes", t0: pd.Timestamp, t1: pd.Timestamp, lon_deg: f
         cursor += one_day
 
 
-def _format_time_axis(ax: "plt.Axes") -> None:
+def _format_time_axis(ax: plt.Axes) -> None:
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
     ax.xaxis.set_minor_locator(mdates.HourLocator())
@@ -178,7 +178,7 @@ def _render(station: str, year: int, doy: int) -> dict[str, Path]:
         "svg": FIG_DIR / "fig02_event_example.svg",
     }
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    for ext, path in out_paths.items():
+    for path in out_paths.values():
         fig.savefig(path)
     plt.close(fig)
     return out_paths

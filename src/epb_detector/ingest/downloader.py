@@ -41,7 +41,7 @@ def fetch_rinex(station: str, year: int, doy: int, retries: int = 3) -> Path:
     for attempt in range(retries):
         try:
             return _LEGACY.fetch_rinex_ibge(station, year, doy, out_dir)  # type: ignore[attr-defined]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             last_exc = e
             time.sleep(2 ** attempt)
     raise RuntimeError(
@@ -57,7 +57,7 @@ def fetch_sp3(year: int, doy: int, retries: int = 3) -> Path:
     for attempt in range(retries):
         try:
             return _LEGACY.fetch_sp3(year, doy, out_dir)  # type: ignore[attr-defined]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             last_exc = e
             time.sleep(2 ** attempt)
     raise RuntimeError(f"SP3 download failed for {year}/{doy:03d}: {last_exc}")

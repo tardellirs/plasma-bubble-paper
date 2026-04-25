@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pandas as pd
 from fastapi import APIRouter
 
 from epb_detector.ingest import cache
@@ -32,7 +31,7 @@ def status() -> dict:
     )
     ok_dur = df.loc[df["status"] == "ok", "duration_s"]
     return {
-        "total": int(len(df)),
+        "total": len(df),
         "ok": int(counts.get("ok", 0)),
         "failed": int(counts.get("failed", 0)),
         "skipped": int(counts.get("skipped", 0)),

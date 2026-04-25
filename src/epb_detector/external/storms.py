@@ -18,7 +18,6 @@ phase** as the time from the minimum until Dst returns above -30 nT.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd

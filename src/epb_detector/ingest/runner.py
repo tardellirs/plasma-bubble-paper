@@ -12,7 +12,7 @@ from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-from epb_detector.config import SETTINGS  # noqa: E402
+from epb_detector.config import SETTINGS
 
 
 def _ensure_output_dirs(year: int, doy: int, sta: str) -> tuple[Path, Path]:
@@ -52,7 +52,7 @@ def run_pyoasis_pipeline(sta: str, year: int, doy: int) -> dict[str, Path]:
     pyOASIS.SIDXcalc(sta, f"{doy:03d}", str(year), sta_out, sta_out, show_plot=False)
     try:
         pyOASIS.TECcalc(sta, f"{doy:03d}", str(year), sta_out, sta_out, show_plot=False)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # TECcalc requires a calibration solver that occasionally fails on
         # data-poor days; we record the failure but continue.
         (sta_out / "TECcalc.error.txt").write_text(repr(e))

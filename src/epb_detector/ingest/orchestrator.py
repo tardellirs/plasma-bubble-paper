@@ -46,7 +46,7 @@ def _run_one(job: IngestJob) -> cache.IngestRecord:
         runner.run_pyoasis_pipeline(job.sta, job.year, job.doy)
         status = "ok"
         error: str | None = None
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         status = "failed"
         error = f"{type(e).__name__}: {e}"
     return cache.IngestRecord(

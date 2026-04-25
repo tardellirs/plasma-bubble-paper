@@ -108,7 +108,6 @@ def _count_concurrent_positives(
 
     df_times = pd.DatetimeIndex(df["window_start"]).tz_convert(None).to_numpy()
     df_lons = df["ipp_lon_mean"].to_numpy()
-    df_sats = df["sat"].to_numpy()
 
     # Count distinct satellites (including the candidate's own) whose positive
     # window is within ±tol minutes and ±lon_window_deg of the candidate.

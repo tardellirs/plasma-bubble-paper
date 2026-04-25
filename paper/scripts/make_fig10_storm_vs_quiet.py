@@ -22,10 +22,10 @@ from sklearn.metrics import precision_recall_curve
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
 
-from _style import COLORS, use  # noqa: E402
+from _style import COLORS, use
 
-from epb_detector.config import SETTINGS  # noqa: E402
-from epb_detector.models import xgb as xgb_model  # noqa: E402
+from epb_detector.config import SETTINGS
+from epb_detector.models import xgb as xgb_model
 
 REPO = SETTINGS.paths.repo_root
 FIG_DIR = SETTINGS.paths.paper_figures
@@ -41,9 +41,8 @@ def _file_sha256(path: Path) -> str:
 
 
 def _load(snapshot_id: str = "v1") -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
-    snap = SETTINGS.paths.data_snapshots / snapshot_id
-    feats = pd.read_parquet(snap / "features.parquet")
-    labels = pd.read_parquet(snap / "labels.parquet")
+    # The full labels parquet (rather than the trimmed snapshot) keeps the
+    # storm-context columns we need for splitting by phase.
     full = pd.read_parquet(SETTINGS.paths.data_processed / f"labels_{snapshot_id}.parquet")
     proba = xgb_model.predict_proba(full, "xgb_v0.2.0")
     return full, full["label"].astype(int).to_numpy(), proba

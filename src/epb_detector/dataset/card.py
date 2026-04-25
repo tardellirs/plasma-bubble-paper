@@ -104,7 +104,7 @@ def _month_table(df: pd.DataFrame) -> str:
     return monthly.to_markdown()
 
 
-def render_dataset_card(manifest: "SnapshotManifest", df: pd.DataFrame) -> str:
+def render_dataset_card(manifest: SnapshotManifest, df: pd.DataFrame) -> str:
     pct_pos = (manifest.n_positives / max(1, manifest.n_windows)) * 100.0
     return _TEMPLATE.format(
         snapshot_id=manifest.snapshot_id,

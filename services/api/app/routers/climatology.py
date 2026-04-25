@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import duckdb
-import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
 from epb_detector.config import SETTINGS

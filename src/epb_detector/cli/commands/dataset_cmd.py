@@ -27,4 +27,4 @@ def snapshot_cmd(
     df = pd.read_parquet(label_path)
     out_dir = snapshot.write_snapshot(df, snapshot_id=version)
     rprint(f"[green]Snapshot saved to[/] {out_dir}")
-    rprint(f"  meta.json, dataset_card.md, features/labels/splits parquet")
+    rprint("  meta.json, dataset_card.md, features/labels/splits parquet")

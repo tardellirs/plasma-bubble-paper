@@ -7,14 +7,12 @@ v1 labels parquet.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
-import duckdb
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from epb_detector.config import SETTINGS
-from epb_detector.external import space_weather, storms
+from epb_detector.external import space_weather
 
 router = APIRouter(prefix="/storms", tags=["storms"])
 

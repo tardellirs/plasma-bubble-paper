@@ -20,7 +20,7 @@ import logging
 import re
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -48,7 +48,7 @@ class FetchResult:
 
 def _request(url: str, timeout: int = 60) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
 
 
@@ -56,11 +56,7 @@ def _request(url: str, timeout: int = 60) -> bytes:
 # Kp / ap / F10.7
 # ---------------------------------------------------------------------------
 
-KP_COLUMNS = (
-    "Kp1 Kp2 Kp3 Kp4 Kp5 Kp6 Kp7 Kp8 "
-    "ap1 ap2 ap3 ap4 ap5 ap6 ap7 ap8 "
-    "Ap SN F107obs F107adj"
-).split()
+KP_COLUMNS = ["Kp1", "Kp2", "Kp3", "Kp4", "Kp5", "Kp6", "Kp7", "Kp8", "ap1", "ap2", "ap3", "ap4", "ap5", "ap6", "ap7", "ap8", "Ap", "SN", "F107obs", "F107adj"]
 
 
 def fetch_kp_ap(force: bool = False, ttl_hours: float = 24.0) -> FetchResult:
@@ -173,7 +169,7 @@ def fetch_dst(start: datetime, end: datetime, force: bool = False) -> FetchResul
             url = tmpl.format(yyyymm=yyyymm)
             try:
                 raw = _request(url, timeout=30).decode("ascii", errors="replace")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Dst %s missing at %s (%s)", yyyymm, url, e)
                 continue
             month_df = _parse_dst_html(raw, int(yyyymm[:4]), int(yyyymm[4:]))

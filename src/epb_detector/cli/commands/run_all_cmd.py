@@ -6,8 +6,6 @@ Runs the post-ingest half of the pipeline as a single command. Useful after
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import typer
 from rich import print as rprint
 

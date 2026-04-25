@@ -70,11 +70,20 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",     # line length — trust the formatter
+    "B008",     # FastAPI / Typer use `param = Query(...)` defaults idiomatically
+    "N806",     # Allow uppercase `X` for ML feature matrices
+    "RUF001",   # Unicode mathematical chars (×, –, ∪) intentional in docstrings
+    "RUF002",
+    "RUF003",
+    "SIM108",   # Allow if/else where it reads better than a ternary
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["B", "N802", "N806"]
+"tests/**" = ["B", "N802", "N806", "F841"]
 "paper/scripts/**" = ["E402", "N802", "N806"]
+"services/api/**" = ["B008"]
 
 [tool.mypy]
 python_version = "3.10"

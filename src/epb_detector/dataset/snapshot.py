@@ -51,7 +51,7 @@ def _git_sha() -> str:
             text=True,
             check=True,
         ).stdout.strip()
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "nogit"
 
 
@@ -128,7 +128,7 @@ def write_snapshot(
         created_at=datetime.now(timezone.utc).isoformat(),
         git_sha=_git_sha(),
         rule_version=str(rule_version),
-        n_windows=int(len(df)),
+        n_windows=len(df),
         n_positives=int((df["label"] == 1).sum()),
         n_station_days=sta_doy_pairs,
         stations=sorted(df["sta"].dropna().unique().tolist()) if "sta" in df else [],
