@@ -1,0 +1,48 @@
+{
+  "figures": {
+    "fig02_event_example": {
+      "doy": 359,
+      "files": {
+        "pdf": "paper/figures/fig02_event_example.pdf",
+        "png": "paper/figures/fig02_event_example.png",
+        "svg": "paper/figures/fig02_event_example.svg"
+      },
+      "generated_at": "2026-04-25T11:35:25.084472+00:00",
+      "script": "paper/scripts/make_fig02_event.py",
+      "sha256": {
+        "pdf": "928a28aa538fe3c745f38de6aa1470ead0b35b594495bc2ed8bce5bc82685001",
+        "png": "fd7b7970ed99144c28eb2140743cb8f16fdd56e50fd4c53c8e27a0d6faacec0e",
+        "svg": "301aaef1c4e7e93a99aa4c3d88bf0f22bfbc7515455e5e6b6d34ffd86fbcf30b"
+      },
+      "station": "SALU",
+      "year": 2015
+    },
+    "fig10_storm_vs_quiet": {
+      "files": {
+        "pdf": "paper/figures/fig10_storm_vs_quiet.pdf",
+        "png": "paper/figures/fig10_storm_vs_quiet.png"
+      },
+      "generated_at": "2026-04-25T12:17:20.782893+00:00",
+      "model_id": "xgb_v0.2.0",
+      "script": "paper/scripts/make_fig10_storm_vs_quiet.py",
+      "sha256": {
+        "pdf": "f74d6298f12eb87e833cbe1cd8c6af83ca97e97431eb5e7d345b0a1507429eca",
+        "png": "8cb471432f95b559b5283b539faddac87a2c2656d4473e26634f371d73571253"
+      },
+      "snapshot_id": "v1"
+    },
+    "fig11_superposed_epoch": {
+      "files": {
+        "pdf": "paper/figures/fig11_superposed_epoch.pdf",
+        "png": "paper/figures/fig11_superposed_epoch.png"
+      },
+      "generated_at": "2026-04-25T12:17:26.500783+00:00",
+      "script": "paper/scripts/make_fig11_superposed_epoch.py",
+      "sha256": {
+        "pdf": "614e8ed470611b68de42fbe7b6de627d23872a771cce767839c26aeeb8b41c1f",
+        "png": "f434ad6f865a8e32bf22977990fde72e1fcf5786ead28704698ca152a9486d8e"
+      },
+      "snapshot_id": "v1"
+    }
+  }
+}

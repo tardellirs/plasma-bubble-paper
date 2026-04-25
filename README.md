@@ -1,3 +1,44 @@
+# Plasma Bubble Paper
+
+Workspace for the Equatorial Plasma Bubble (EPB) detection paper. It bundles
+two Python packages plus a Next.js web app and publication-figure pipeline:
+
+- **`pyOASIS/`** — the upstream Open-Access System for Ionospheric Studies
+  (Picanço et al., 2025, GPS Solutions, *submitted*). Processes RINEX + MGEX
+  SP3 inputs to ROTI / ΔTEC / SIDX / TEC indices. Original README below.
+- **`src/epb_detector/`** — the new layer added in this repo. Bulk ingest,
+  feature extraction, weak labels (Pi 1997 / Cherniak 2014), space-weather
+  context (Kp / ap / Dst / F10.7), XGBoost baseline, snapshot manifest, and
+  literature case-study labels.
+- **`services/api/`** — FastAPI exposing `/events`, `/storms/*`,
+  `/training-data/*`, `/ingest/status`. DuckDB over the parquet outputs.
+- **`web/`** — Next.js 14 + Tailwind + MapLibre + Recharts. Pages: `/`,
+  `/map`, `/storms`, `/dataset`, `/methods`.
+- **`paper/scripts/`** — idempotent figure scripts (matplotlib + AGU /
+  IEEE / `slides_dark` presets) writing PDFs/PNGs/SVGs with a SHA-pinned
+  manifest.
+- **`notebooks/colab_ramp.ipynb`** — self-contained Colab notebook for
+  running a wide ramp on Colab + Google Drive without modifying anything.
+
+Plans live under `docs/`. Architecture and common ops live in `CLAUDE.md`.
+
+```bash
+# Quick local install (Python 3.10+):
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,api,paper]"
+
+# Run a tiny MVP:
+epb ingest mvp                 # 3 stations × 10 days, ~30 min
+epb run-all                    # features → labels → snapshot → train → figures
+
+# Web app:
+cd web && pnpm install && pnpm build && pnpm dev
+```
+
+Released under CC BY-NC 4.0 (same as upstream OASIS). See `LICENSE`.
+
+---
+
 <p align="center">
   <img src="img/logo_bar.png" alt="OASIS Logo" width="900"/>
 </p>

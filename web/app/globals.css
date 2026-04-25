@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0e1a;
+  --bg-soft: #0e1320;
+  --fg: #f5f6f8;
+  --fg-muted: #8c93a8;
+  --accent: #0fa3b1;
+  --accent-warm: #f7a072;
+  --warn: #e63946;
+  --border: #1c2236;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background-color: rgba(15, 163, 177, 0.4);
+}
+
+.gradient-radial {
+  background: radial-gradient(
+    1100px circle at 30% -10%,
+    rgba(15, 163, 177, 0.18),
+    transparent 55%
+  );
+}
+
+.card {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background-color: rgba(14, 19, 32, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  color: #001017;
+}
+
+.btn-primary:hover {
+  background-color: #14c0d0;
+}
+
+.btn-ghost {
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.btn-ghost:hover {
+  background-color: var(--bg-soft);
+}
+
+.kbd {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 0.35rem;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}

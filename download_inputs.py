@@ -16,6 +16,7 @@ import argparse
 import gzip
 import os
 import shutil
+import subprocess
 import sys
 import urllib.request
 import urllib.error
@@ -54,6 +55,19 @@ def gunzip(src: Path, dest: Path) -> None:
     src.unlink()
 
 
+def uncompress_z(src: Path, dest: Path) -> None:
+    """Decompress an LZW .Z file via gunzip/uncompress and write to dest."""
+    for tool in ("gunzip", "uncompress"):
+        if shutil.which(tool):
+            subprocess.run([tool, "-f", str(src)], check=True)
+            produced = src.with_suffix("")  # strips ".Z"
+            produced.rename(dest)
+            return
+    raise RuntimeError(
+        "Need 'gunzip' or 'uncompress' on PATH to decompress legacy .Z SP3 files."
+    )
+
+
 def fetch_sp3(year: int, doy: int, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     week = gps_week(year, doy)
@@ -74,7 +88,6 @@ def fetch_sp3(year: int, doy: int, out_dir: Path) -> Path:
             print(f"SP3 already present: {dest.name}")
             return dest
 
-    tmp = None
     for prefix in prefixes:
         name = f"{prefix}_{year}{doy:03d}0000_01D_05M_ORB.SP3"
         dest = out_dir / name
@@ -87,6 +100,25 @@ def fetch_sp3(year: int, doy: int, out_dir: Path) -> Path:
                     gunzip(tmp, dest)
                     print(f"SP3 saved: {dest}")
                     return dest
+
+    # Fallback: pre-2018 MGEX archive uses legacy short names like
+    # gbm{week}{dow}.sp3.Z (LZW-compressed). Try a few analysis-center
+    # prefixes; promote the result to the modern long-form filename so the
+    # rest of the pipeline finds it via the standard *.SP3 glob.
+    date = datetime(year, 1, 1) + timedelta(days=doy - 1)
+    dow = (date - datetime(1980, 1, 6)).days % 7
+    legacy_prefixes = ["gbm", "com", "wum", "grm", "tum"]
+    long_dest = out_dir / f"GBM0MGXRAP_{year}{doy:03d}0000_01D_05M_ORB.SP3"
+    for ac in legacy_prefixes:
+        short = f"{ac}{week}{dow}.sp3.Z"
+        for host in hosts:
+            url = f"{host}/{week}/{short}"
+            tmp = out_dir / short
+            if download(url, tmp):
+                uncompress_z(tmp, long_dest)
+                print(f"SP3 saved: {long_dest}  (from legacy {short})")
+                return long_dest
+
     raise RuntimeError(
         f"Could not download SP3 orbit for year={year} doy={doy:03d} (GPS week {week})."
     )

@@ -26,6 +26,37 @@ OUTPUT/
 INPUT/RINEX/
 INPUT/ORBITS/
 
+# EPB detector data (large, regenerated)
+data/raw/
+data/processed/
+data/training_snapshots/
+data/space_weather/
+data/labels/
+cache/
+models/*/
+!models/registry.json
+!models/.gitkeep
+paper/figures/*.pdf
+paper/figures/*.png
+paper/figures/*.svg
+paper/tables/*.tex
+paper/snapshots/
+
+# Node / web
+node_modules/
+.next/
+.turbo/
+dist/
+.pnpm-store/
+playwright-report/
+test-results/
+
+# uv
+.uv/
+
+# Claude Code local state
+.claude/
+
 # Data files
 *.zip
 *.tar

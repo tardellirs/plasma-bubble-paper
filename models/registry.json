@@ -1,0 +1,127 @@
+{
+  "xgb_v0.1.0": {
+    "created_at": "2026-04-25T11:47:53.881732+00:00",
+    "feature_columns": [
+      "roti_max",
+      "roti_p95",
+      "roti_mean",
+      "roti_std",
+      "roti_duration_above",
+      "roti_slope",
+      "dtec_max",
+      "dtec_p95",
+      "dtec_std",
+      "dtec_slope",
+      "sidx_max",
+      "sidx_mean",
+      "elevation_mean",
+      "ipp_lon_mean",
+      "ipp_lat_mean",
+      "qd_lat_mean",
+      "local_time_mean",
+      "n_samples"
+    ],
+    "git_sha": "7fcfcbf",
+    "hyperparams": {
+      "colsample_bytree": 0.85,
+      "eval_metric": "aucpr",
+      "learning_rate": 0.06,
+      "max_depth": 5,
+      "n_estimators": 400,
+      "objective": "binary:logistic",
+      "reg_lambda": 1.0,
+      "subsample": 0.85,
+      "tree_method": "hist"
+    },
+    "metrics": {
+      "brier": 0.0009447882384380293,
+      "confusion": [
+        [
+          23189,
+          23
+        ],
+        [
+          3,
+          1307
+        ]
+      ],
+      "f1_at_05": 0.9901515151515151,
+      "far_at_tpr_90": 0.0008185421333792866,
+      "n": 24522,
+      "n_positive": 1310,
+      "pr_auc": 0.9965616775228447,
+      "roc_auc": 0.9998691615155625
+    },
+    "model_id": "xgb_v0.1.0",
+    "notes": "",
+    "rule_version": "weak-v1",
+    "snapshot_id": "v0",
+    "train_window_end": "2023-12-22 23:58:37.583999634+00:00",
+    "train_window_start": "2023-03-20 00:01:07.392000198+00:00"
+  },
+  "xgb_v0.2.0": {
+    "created_at": "2026-04-25T12:16:00.004546+00:00",
+    "feature_columns": [
+      "roti_max",
+      "roti_p95",
+      "roti_mean",
+      "roti_std",
+      "roti_duration_above",
+      "roti_slope",
+      "dtec_max",
+      "dtec_p95",
+      "dtec_std",
+      "dtec_slope",
+      "sidx_max",
+      "sidx_mean",
+      "elevation_mean",
+      "ipp_lon_mean",
+      "ipp_lat_mean",
+      "qd_lat_mean",
+      "local_time_mean",
+      "n_samples",
+      "dst",
+      "kp",
+      "ap",
+      "F107obs",
+      "hours_from_dst_min"
+    ],
+    "git_sha": "7fcfcbf",
+    "hyperparams": {
+      "colsample_bytree": 0.85,
+      "eval_metric": "aucpr",
+      "learning_rate": 0.06,
+      "max_depth": 5,
+      "n_estimators": 400,
+      "objective": "binary:logistic",
+      "reg_lambda": 1.0,
+      "subsample": 0.85,
+      "tree_method": "hist"
+    },
+    "metrics": {
+      "brier": 0.0011379791079433202,
+      "confusion": [
+        [
+          23178,
+          34
+        ],
+        [
+          0,
+          1310
+        ]
+      ],
+      "f1_at_05": 0.987189148455162,
+      "far_at_tpr_90": 0.0008185421333792866,
+      "n": 24522,
+      "n_positive": 1310,
+      "pr_auc": 0.9951535539570917,
+      "roc_auc": 0.9998352063226049
+    },
+    "model_id": "xgb_v0.2.0",
+    "notes": "",
+    "rule_version": "v2",
+    "snapshot_id": "v1",
+    "train_window_end": "2023-12-22 23:58:37.583999634+00:00",
+    "train_window_start": "2023-03-20 00:01:07.392000198+00:00"
+  }
+}

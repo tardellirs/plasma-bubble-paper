@@ -26,9 +26,9 @@ import pyOASIS
 # ===============================
 # USER PARAMETERS
 # ===============================
-sta  = "BOAV"   # GNSS station code
-doy  = "049"    # Day of Year (DOY)
-year = "2023"   # Year (YYYY)
+sta  = "SALU"   # GNSS station code
+doy  = "359"    # Day of Year (DOY)  -> 2015-12-25
+year = "2015"   # Year (YYYY)
 
 # ===============================
 # DIRECTORY DEFINITIONS
@@ -62,28 +62,28 @@ pyOASIS.RNXclean(sta, doy, year, rinex_dir, orbit_output, sta_output)
 # ===============================
 # Apply geometry-free leveling to remove satellite and receiver biases,
 # performing the final detection of outliers and cycle slips. (Output: .RNX3 files)
-pyOASIS.RNXlevelling(sta, sta_output, show_plot=True)
+pyOASIS.RNXlevelling(sta, sta_output, show_plot=False)
 
 # ===============================
 # 4) ROTIcalc
 # ===============================
 # Compute the Rate of TEC Index (ROTI) using leveled geometry-free data from .RNX3 files
-pyOASIS.ROTIcalc(sta, doy, year, sta_output, sta_output, show_plot=True)
+pyOASIS.ROTIcalc(sta, doy, year, sta_output, sta_output, show_plot=False)
 
 # ===============================
 # 5) DTECcalc
 # ===============================
 # Compute the Delta TEC index using leveled geometry-free data from .RNX3 files
-pyOASIS.DTECcalc(sta, doy, year, sta_output, sta_output, show_plot=True)
+pyOASIS.DTECcalc(sta, doy, year, sta_output, sta_output, show_plot=False)
 
 # ===============================
 # 6) SIDXcalc
 # ===============================
 # Compute the SIDX index using leveled geometry-free data from .RNX3 files
-pyOASIS.SIDXcalc(sta, doy, year, sta_output, sta_output, show_plot=True)
+pyOASIS.SIDXcalc(sta, doy, year, sta_output, sta_output, show_plot=False)
 
 # ===============================
 # 7) TECcalc
 # ===============================
 # Compute absolute Total Electron Content (TEC) from leveled geometry-free combinations
-pyOASIS.TECcalc(sta, doy, year, sta_output, sta_output, show_plot=True)
+pyOASIS.TECcalc(sta, doy, year, sta_output, sta_output, show_plot=False)

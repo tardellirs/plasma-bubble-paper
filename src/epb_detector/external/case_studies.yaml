@@ -1,0 +1,62 @@
+# Curated EPB case-study events from the published literature.
+#
+# Each entry records a (station, day) where authors confirmed an equatorial
+# plasma bubble through GNSS scintillation, ROTI, ionossondas, or airglow
+# observations. Used as an independent label source ("literature-v1") for
+# robustness evaluation.
+#
+# Fields:
+#   stations: 4-letter codes that observed the event
+#   reference: short-form citation
+#   doi: DOI of the publication
+#   notes: optional context (storm conditions, instrument)
+#
+# Add new entries via:  epb labels external add ...
+#
+# IMPORTANT: this list is sparse on purpose. The goal is to populate it with
+# events whose ground truth is independent of our heuristic — i.e. confirmed
+# by a different instrument or methodology than the one we use. Quality over
+# quantity.
+
+events:
+  - date: 2015-12-25
+    stations: [SALU, BOAV, BELE]
+    reference: "Picanço et al., 2022, J. Atmos. Sol.-Terr. Phys., 232"
+    doi: "10.1016/j.jastp.2022.105873"
+    notes: "Strong post-sunset EPBs over the Brazilian sector during a quiet day."
+
+  - date: 2014-10-08
+    stations: [SALU, BRAZ, BOAV]
+    reference: "Muella et al., 2017, Adv. Space Res., 60"
+    doi: "10.1016/j.asr.2017.05.025"
+    notes: "Solar maximum, multi-station scintillation event."
+
+  - date: 2017-09-08
+    stations: [SALU, BRAZ, BOAV, POAL]
+    reference: "Spogli et al., 2021, Space Weather, 19"
+    doi: "10.1029/2020SW002632"
+    notes: "September 2017 storm; intense PPEF response."
+
+  - date: 2024-05-10
+    stations: [SALU, BOAV, BRAZ, MAPA, BELE]
+    reference: "Tsurutani et al., 2024 (Mother's Day Storm reports)"
+    doi: "10.1029/2024SW004031"
+    notes: "Super storm; widespread plumes from ~21 UT."
+
+  - date: 2024-05-11
+    stations: [SALU, BOAV, BRAZ]
+    reference: "Tsurutani et al., 2024"
+    doi: "10.1029/2024SW004031"
+    notes: "Recovery phase; suppressed PRE in some sectors."
+
+  - date: 2023-11-05
+    stations: [SALU, BOAV]
+    reference: "INPE EMBRACE bulletin, Nov 2023"
+    doi: ""
+    notes: "G3 storm, post-sunset scintillation."
+
+  - date: 2023-12-01
+    stations: [SALU, BOAV, BRAZ]
+    reference: "INPE EMBRACE bulletin, Dec 2023"
+    doi: ""
+    notes: "G3, multi-station ROTI > 1 TECU/min."
