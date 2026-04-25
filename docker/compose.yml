@@ -74,7 +74,11 @@ services:
     # next run skips it. Infinite restart loops mask real OOMs.
     restart: "no"
     profiles: ["work"]
-    command: ["python", "-m", "epb_detector.cli", "ingest", "phase2a"]
+    # --skip BOAV: BOAV trips a known matplotlib datetime bug inside
+    # pyOASIS for many 2023/2024 days. Skipping it keeps the ingest moving
+    # and the catalog still has SALU/POAL/BRAZ/MAPA/BELE/PALM/UFPR.
+    command:
+      ["python", "-m", "epb_detector.cli", "ingest", "phase2a", "--skip", "BOAV"]
     volumes:
       - epb_data:/data
     environment:
