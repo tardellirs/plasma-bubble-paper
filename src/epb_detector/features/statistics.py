@@ -38,9 +38,15 @@ def duration_above(times: pd.Series, values: pd.Series, threshold: float) -> flo
     """
     if values.empty:
         return 0.0
-    times_dt = pd.to_datetime(times.to_numpy())
-    deltas = np.diff(times_dt) / np.timedelta64(1, "s")
-    if deltas.size:
+    # Always coerce to a tz-naive datetime64[ns] array so np.diff produces a
+    # timedelta64[ns] (not object) — the division is then well-defined across
+    # numpy / pandas versions (CI runs an older numpy than local).
+    idx = pd.DatetimeIndex(times)
+    if idx.tz is not None:
+        idx = idx.tz_convert(None)
+    times_arr = idx.to_numpy(dtype="datetime64[ns]")
+    if times_arr.size > 1:
+        deltas = np.diff(times_arr).astype("timedelta64[s]").astype("float64")
         median_dt = float(np.median(deltas))
         weights = np.append(deltas, median_dt)
     else:
