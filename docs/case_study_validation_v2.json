@@ -1,0 +1,189 @@
+{
+  "model_id": "xgb_v0.3.0",
+  "snapshot_id": "v2",
+  "window_start": "2023-09-02 00:00:00+00:00",
+  "window_end": "2024-05-15 00:00:00+00:00",
+  "n_case_studies_total": 7,
+  "n_in_window": 4,
+  "n_evaluable": 3,
+  "event_recall": 1.0,
+  "station_recall": 1.0,
+  "stations_testable": 6,
+  "stations_detected": 6,
+  "per_event": [
+    {
+      "date": "2015-12-25",
+      "in_window": false,
+      "expected_stations": [
+        "SALU",
+        "BOAV",
+        "BELE"
+      ],
+      "reference": "Pican\u00e7o et al., 2022, J. Atmos. Sol.-Terr. Phys., 232",
+      "stations": [],
+      "verdict": "out_of_window"
+    },
+    {
+      "date": "2014-10-08",
+      "in_window": false,
+      "expected_stations": [
+        "SALU",
+        "BRAZ",
+        "BOAV"
+      ],
+      "reference": "Muella et al., 2017, Adv. Space Res., 60",
+      "stations": [],
+      "verdict": "out_of_window"
+    },
+    {
+      "date": "2017-09-08",
+      "in_window": false,
+      "expected_stations": [
+        "SALU",
+        "BRAZ",
+        "BOAV",
+        "POAL"
+      ],
+      "reference": "Spogli et al., 2021, Space Weather, 19",
+      "stations": [],
+      "verdict": "out_of_window"
+    },
+    {
+      "date": "2024-05-10",
+      "in_window": true,
+      "expected_stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ",
+        "MAPA",
+        "BELE"
+      ],
+      "reference": "Tsurutani et al., 2024 (Mother's Day Storm reports)",
+      "stations": [
+        {
+          "sta": "SALU",
+          "ingest_state": "ingested_ok",
+          "model_events": 40,
+          "detected": true
+        },
+        {
+          "sta": "BOAV",
+          "ingest_state": "not_in_queue",
+          "model_events": 0,
+          "detected": false
+        },
+        {
+          "sta": "BRAZ",
+          "ingest_state": "ingested_ok",
+          "model_events": 42,
+          "detected": true
+        },
+        {
+          "sta": "MAPA",
+          "ingest_state": "ingest_failed:failed",
+          "model_events": 0,
+          "detected": false
+        },
+        {
+          "sta": "BELE",
+          "ingest_state": "ingested_ok",
+          "model_events": 41,
+          "detected": true
+        }
+      ],
+      "verdict": "hit",
+      "testable_stations": 3,
+      "matched_stations": 3
+    },
+    {
+      "date": "2024-05-11",
+      "in_window": true,
+      "expected_stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ"
+      ],
+      "reference": "Tsurutani et al., 2024",
+      "stations": [
+        {
+          "sta": "SALU",
+          "ingest_state": "ingested_ok",
+          "model_events": 38,
+          "detected": true
+        },
+        {
+          "sta": "BOAV",
+          "ingest_state": "not_in_queue",
+          "model_events": 0,
+          "detected": false
+        },
+        {
+          "sta": "BRAZ",
+          "ingest_state": "ingested_ok",
+          "model_events": 41,
+          "detected": true
+        }
+      ],
+      "verdict": "hit",
+      "testable_stations": 2,
+      "matched_stations": 2
+    },
+    {
+      "date": "2023-11-05",
+      "in_window": true,
+      "expected_stations": [
+        "SALU",
+        "BOAV"
+      ],
+      "reference": "INPE EMBRACE bulletin, Nov 2023",
+      "stations": [
+        {
+          "sta": "SALU",
+          "ingest_state": "ingested_ok",
+          "model_events": 44,
+          "detected": true
+        },
+        {
+          "sta": "BOAV",
+          "ingest_state": "ingest_failed:failed",
+          "model_events": 0,
+          "detected": false
+        }
+      ],
+      "verdict": "hit",
+      "testable_stations": 1,
+      "matched_stations": 1
+    },
+    {
+      "date": "2023-12-01",
+      "in_window": true,
+      "expected_stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ"
+      ],
+      "reference": "INPE EMBRACE bulletin, Dec 2023",
+      "stations": [
+        {
+          "sta": "SALU",
+          "ingest_state": "not_in_queue",
+          "model_events": 0,
+          "detected": false
+        },
+        {
+          "sta": "BOAV",
+          "ingest_state": "not_in_queue",
+          "model_events": 0,
+          "detected": false
+        },
+        {
+          "sta": "BRAZ",
+          "ingest_state": "not_in_queue",
+          "model_events": 0,
+          "detected": false
+        }
+      ],
+      "verdict": "no_data_to_test"
+    }
+  ]
+}
