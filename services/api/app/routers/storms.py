@@ -7,6 +7,7 @@ v1 labels parquet.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Query
@@ -16,13 +17,18 @@ from epb_detector.external import space_weather
 
 router = APIRouter(prefix="/storms", tags=["storms"])
 
-_LABELS_DEFAULT = SETTINGS.paths.data_processed / "labels_v1.parquet"
+
+def _latest_labels_path() -> Path | None:
+    """Return the most recent ``labels_v*.parquet`` (sorted lexicographically)."""
+    candidates = sorted(SETTINGS.paths.data_processed.glob("labels_v*.parquet"))
+    return candidates[-1] if candidates else None
 
 
 def _load_labels() -> pd.DataFrame:
-    if not _LABELS_DEFAULT.exists():
+    path = _latest_labels_path()
+    if path is None or not path.exists():
         return pd.DataFrame()
-    return pd.read_parquet(_LABELS_DEFAULT)
+    return pd.read_parquet(path)
 
 
 @router.get("/timeline")
