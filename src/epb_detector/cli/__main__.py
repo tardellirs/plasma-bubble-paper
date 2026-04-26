@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from epb_detector.cli.commands import (
+    analysis_cmd,
     dataset_cmd,
     events_cmd,
     features_cmd,
@@ -33,6 +34,7 @@ app.add_typer(dataset_cmd.app, name="dataset", help="Snapshot the labeled datase
 app.add_typer(paper_cmd.app, name="paper", help="Render publication figures.")
 app.add_typer(run_all_cmd.app, name="run-all", help="Post-ingest pipeline: features→labels→snapshot→train→figures.")
 app.add_typer(storms_cmd.app, name="storms", help="Build geomagnetic-storm catalogues for analysis.")
+app.add_typer(analysis_cmd.app, name="analysis", help="Statistical analyses on predictions parquets.")
 
 
 if __name__ == "__main__":  # pragma: no cover
