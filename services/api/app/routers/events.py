@@ -70,3 +70,55 @@ def events_summary() -> dict:
         }
     finally:
         con.close()
+
+
+_PRED_PATTERN = SETTINGS.paths.data_processed / "predictions_v*.parquet"
+
+
+@router.get("/timeseries")
+def event_timeseries(
+    sta: str = Query(..., description="Station code, e.g. SALU"),
+    sat: str = Query(..., description="Satellite, e.g. R03"),
+    t0: datetime = Query(..., description="Window start (UTC)"),
+    t1: datetime = Query(..., description="Window end (UTC)"),
+) -> dict:
+    """Per-window time series for one (station, satellite) pair.
+
+    Pulls from the latest ``predictions_v*.parquet`` so the chart in the
+    map's event detail panel can show ROTI / ΔTEC / SIDX / model probability
+    side by side. Time range is bounded — typical caller pads ±30 minutes
+    around an event.
+    """
+    candidates = sorted(_PRED_PATTERN.parent.glob("predictions_v*.parquet"))
+    if not candidates:
+        return {"rows": []}
+    pattern = str(candidates[-1])
+    con = duckdb.connect()
+    try:
+        df = con.execute(
+            f"""
+            SELECT window_start AS time,
+                   epb_probability AS prob,
+                   roti_max,
+                   dtec_max,
+                   sidx_max,
+                   label,
+                   kp,
+                   dst,
+                   storm_phase
+            FROM parquet_scan('{pattern}')
+            WHERE sta = ?
+              AND sat = ?
+              AND window_start >= ?
+              AND window_start <= ?
+            ORDER BY window_start
+            """,
+            [sta.upper(), sat.upper(), t0, t1],
+        ).df()
+    finally:
+        con.close()
+    rows = df.to_dict(orient="records")
+    for r in rows:
+        if r.get("time") is not None:
+            r["time"] = r["time"].isoformat()
+    return {"sta": sta.upper(), "sat": sat.upper(), "rows": rows}

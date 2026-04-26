@@ -5,11 +5,17 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { rotiColor, constellationColor } from "@/lib/colors";
 import type { EventRow, Station } from "@/lib/api";
+import { EventDetail } from "@/components/EventDetail";
 
 type Props = {
   events: EventRow[];
   stations: Station[];
 };
+
+// Half-width of the time window (each side of the cursor). Events whose
+// [start, end] overlaps the cursor ± this many milliseconds are shown.
+// 12h gives a "current night" view that doesn't accumulate forever.
+const WINDOW_HALF_MS = 12 * 60 * 60 * 1000;
 
 // Self-contained dark style — raster tiles from OSM with a dark filter
 // applied via a synthetic overlay. We avoid demotiles.maplibre.org because
@@ -54,6 +60,7 @@ export default function MapDeck({ events, stations }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [hover, setHover] = useState<EventRow | null>(null);
+  const [selected, setSelected] = useState<EventRow | null>(null);
 
   // Time slider over the event range.
   const { tMin, tMax } = useMemo(() => {
@@ -181,6 +188,26 @@ export default function MapDeck({ events, stations }: Props) {
         },
       });
 
+      map.on("click", "events-points", (e) => {
+        const f = e.features?.[0];
+        if (!f || !f.properties) return;
+        const p = f.properties as Record<string, string>;
+        const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+        setSelected({
+          sta: p.sta,
+          sat: p.sat,
+          start: p.start,
+          end: p.end,
+          n_windows: Number(p.n_windows ?? 0),
+          peak_probability: Number(p.peak ?? 0),
+          peak_roti: p.peak_roti ? Number(p.peak_roti) : null,
+          ipp_lon_mean: lon,
+          ipp_lat_mean: lat,
+          qd_lat_mean: 0,
+          duration_minutes: Number(p.duration ?? 0),
+        });
+      });
+
       map.on("mousemove", "events-points", (e) => {
         const f = e.features?.[0];
         if (f && f.properties) {
@@ -219,8 +246,14 @@ export default function MapDeck({ events, stations }: Props) {
     if (!map || !map.isStyleLoaded()) return;
     const src = map.getSource("events") as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
+    const lo = tCursor - WINDOW_HALF_MS;
+    const hi = tCursor + WINDOW_HALF_MS;
     const features = events
-      .filter((e) => +new Date(e.start) <= tCursor)
+      .filter((e) => {
+        const s = +new Date(e.start);
+        const en = +new Date(e.end);
+        return en >= lo && s <= hi;
+      })
       .map((e) => ({
         type: "Feature" as const,
         geometry: {
@@ -294,6 +327,7 @@ export default function MapDeck({ events, stations }: Props) {
           <div className="flex items-center justify-between text-xs text-[var(--fg-muted)] mb-2">
             <span className="font-mono">
               cursor · {new Date(tCursor).toISOString().slice(0, 19)}Z
+              <span className="ml-2 opacity-70">(±12h window)</span>
             </span>
             <span>
               <span className="kbd">←</span> back  ·  <span className="kbd">→</span> forward
@@ -311,6 +345,10 @@ export default function MapDeck({ events, stations }: Props) {
           />
         </div>
       </div>
+
+      {selected && (
+        <EventDetail event={selected} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
 }
