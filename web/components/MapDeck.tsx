@@ -12,10 +12,15 @@ type Props = {
   stations: Station[];
 };
 
-// Half-width of the time window (each side of the cursor). Events whose
-// [start, end] overlaps the cursor ± this many milliseconds are shown.
-// 12h gives a "current night" view that doesn't accumulate forever.
-const WINDOW_HALF_MS = 12 * 60 * 60 * 1000;
+// Slider behaviour: cursor snaps to UTC midnight and each step advances
+// 24 h. Visible window = [cursor, cursor + 24h]. Mirrors the daily layout
+// of pyOASIS outputs (one file per station-day) and avoids the previous
+// behaviour where events accumulated across the whole window.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcMidnight(t: number): number {
+  return Math.floor(t / DAY_MS) * DAY_MS;
+}
 
 // Self-contained dark style — raster tiles from OSM with a dark filter
 // applied via a synthetic overlay. We avoid demotiles.maplibre.org because
@@ -62,12 +67,15 @@ export default function MapDeck({ events, stations }: Props) {
   const [hover, setHover] = useState<EventRow | null>(null);
   const [selected, setSelected] = useState<EventRow | null>(null);
 
-  // Time slider over the event range.
+  // Time slider over the event range, snapped to UTC midnight day boundaries.
   const { tMin, tMax } = useMemo(() => {
     if (events.length === 0)
-      return { tMin: Date.now() - 1000, tMax: Date.now() };
+      return { tMin: Date.now() - DAY_MS, tMax: Date.now() };
     const xs = events.map((e) => +new Date(e.start));
-    return { tMin: Math.min(...xs), tMax: Math.max(...xs) };
+    return {
+      tMin: utcMidnight(Math.min(...xs)),
+      tMax: utcMidnight(Math.max(...xs)),
+    };
   }, [events]);
   const [tCursor, setTCursor] = useState<number>(tMax);
 
@@ -246,8 +254,8 @@ export default function MapDeck({ events, stations }: Props) {
     if (!map || !map.isStyleLoaded()) return;
     const src = map.getSource("events") as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
-    const lo = tCursor - WINDOW_HALF_MS;
-    const hi = tCursor + WINDOW_HALF_MS;
+    const lo = tCursor;
+    const hi = tCursor + DAY_MS;
     const features = events
       .filter((e) => {
         const s = +new Date(e.start);
@@ -326,18 +334,19 @@ export default function MapDeck({ events, stations }: Props) {
         <div className="card p-4">
           <div className="flex items-center justify-between text-xs text-[var(--fg-muted)] mb-2">
             <span className="font-mono">
-              cursor · {new Date(tCursor).toISOString().slice(0, 19)}Z
-              <span className="ml-2 opacity-70">(±12h window)</span>
+              {new Date(tCursor).toISOString().slice(0, 10)} UTC
+              <span className="ml-2 opacity-70">(24h window)</span>
             </span>
             <span>
-              <span className="kbd">←</span> back  ·  <span className="kbd">→</span> forward
+              <span className="kbd">←</span> day  ·  <span className="kbd">→</span> day
             </span>
           </div>
           <input
-            aria-label="Time cursor"
+            aria-label="Day cursor"
             type="range"
             min={tMin}
             max={tMax}
+            step={DAY_MS}
             value={tCursor}
             onChange={(e) => setTCursor(Number(e.target.value))}
             className="w-full accent-[var(--accent)]"

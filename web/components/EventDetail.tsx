@@ -7,6 +7,8 @@ import {
   LineChart,
   ReferenceArea,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -28,6 +30,23 @@ type TimeseriesRow = {
 
 type Resp = { sta: string; sat: string; rows: TimeseriesRow[] };
 
+type DayRotiPoint = {
+  time: string;
+  sat: string;
+  system: "G" | "R";
+  system_label: string;
+  roti: number;
+};
+
+type DayRotiResp = {
+  sta: string;
+  date: string;
+  year: number;
+  doy: number;
+  n_points: number;
+  points: DayRotiPoint[];
+};
+
 const PAD_MIN = 30; // minutes of context on each side of the event window
 
 export function EventDetail({
@@ -39,26 +58,43 @@ export function EventDetail({
 }) {
   const [data, setData] = useState<TimeseriesRow[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dayRoti, setDayRoti] = useState<DayRotiPoint[] | null>(null);
+  const [dayRotiLoading, setDayRotiLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setDayRotiLoading(true);
     setData(null);
+    setDayRoti(null);
+
     const tStart = new Date(event.start);
     const tEnd = new Date(event.end);
     const t0 = new Date(tStart.getTime() - PAD_MIN * 60 * 1000);
     const t1 = new Date(tEnd.getTime() + PAD_MIN * 60 * 1000);
-    const qs = new URLSearchParams({
+
+    const qsTs = new URLSearchParams({
       sta: event.sta,
       sat: event.sat,
       t0: t0.toISOString(),
       t1: t1.toISOString(),
     });
-    fetchOrNull<Resp>(`/events/timeseries?${qs.toString()}`).then((resp) => {
+    fetchOrNull<Resp>(`/events/timeseries?${qsTs.toString()}`).then((resp) => {
       if (cancelled) return;
       setData(resp?.rows ?? []);
       setLoading(false);
     });
+
+    const dayUtc = tStart.toISOString().slice(0, 10);
+    const qsDay = new URLSearchParams({ sta: event.sta, date: dayUtc });
+    fetchOrNull<DayRotiResp>(`/events/day-roti?${qsDay.toString()}`).then(
+      (resp) => {
+        if (cancelled) return;
+        setDayRoti(resp?.points ?? []);
+        setDayRotiLoading(false);
+      },
+    );
+
     return () => {
       cancelled = true;
     };
@@ -138,9 +174,43 @@ export function EventDetail({
             />
           </div>
 
+          <ChartCard title={`24-hour ROTI · ${event.sta}`}>
+            {dayRotiLoading ? (
+              <div className="text-xs text-[var(--fg-muted)] py-12 text-center">
+                Loading station-day scatter…
+              </div>
+            ) : dayRoti && dayRoti.length > 0 ? (
+              <>
+                <DayRotiScatter
+                  points={dayRoti}
+                  eventStart={eventStart}
+                  eventEnd={eventEnd}
+                />
+                <div className="mt-2 flex items-center gap-4 text-[10px] text-[var(--fg-muted)] px-1">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+                    GPS
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                    GLONASS
+                  </span>
+                  <span className="ml-auto">
+                    {dayRoti.length.toLocaleString()} samples · event window
+                    shaded red
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-[var(--fg-muted)] py-6">
+                No raw ROTI file on disk for this station-day.
+              </div>
+            )}
+          </ChartCard>
+
           {loading && (
             <div className="text-sm text-[var(--fg-muted)]">
-              Loading time series…
+              Loading event window…
             </div>
           )}
 
@@ -339,6 +409,117 @@ export function EventDetail({
         </div>
       </aside>
     </>
+  );
+}
+
+function DayRotiScatter({
+  points,
+  eventStart,
+  eventEnd,
+}: {
+  points: DayRotiPoint[];
+  eventStart: number;
+  eventEnd: number;
+}) {
+  // Pre-bucket by constellation so Recharts gets two flat datasets it
+  // can render as two coloured Scatter series.
+  const gps = points
+    .filter((p) => p.system === "G")
+    .map((p) => ({ tms: +new Date(p.time), roti: p.roti, sat: p.sat }));
+  const glonass = points
+    .filter((p) => p.system === "R")
+    .map((p) => ({ tms: +new Date(p.time), roti: p.roti, sat: p.sat }));
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const dayStart = Math.floor(eventStart / dayMs) * dayMs;
+  const dayEnd = dayStart + dayMs;
+
+  const ymax = Math.max(
+    1,
+    ...points.map((p) => p.roti).filter((v) => Number.isFinite(v)),
+  );
+
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <ScatterChart margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1c2236" />
+        <XAxis
+          dataKey="tms"
+          type="number"
+          domain={[dayStart, dayEnd]}
+          scale="time"
+          ticks={Array.from({ length: 9 }, (_, i) => dayStart + i * 3 * 3600_000)}
+          tickFormatter={(v) =>
+            new Date(v as number).toISOString().slice(11, 13)
+          }
+          stroke="#6b7280"
+          fontSize={10}
+          label={{
+            value: "Time (UT)",
+            position: "insideBottom",
+            offset: -2,
+            fill: "#6b7280",
+            fontSize: 10,
+          }}
+        />
+        <YAxis
+          dataKey="roti"
+          type="number"
+          domain={[0, Math.ceil(ymax)]}
+          stroke="#6b7280"
+          fontSize={10}
+          label={{
+            value: "ROTI (TECU/min)",
+            angle: -90,
+            position: "insideLeft",
+            offset: 10,
+            fill: "#6b7280",
+            fontSize: 10,
+          }}
+        />
+        <Tooltip
+          cursor={{ strokeDasharray: "3 3", stroke: "#444" }}
+          contentStyle={{
+            background: "rgba(10,14,26,0.95)",
+            border: "1px solid #1c2236",
+            fontSize: 11,
+          }}
+          labelFormatter={() => ""}
+          formatter={(value: number, _name, item) => {
+            const p = item?.payload as { tms: number; sat: string };
+            return [
+              `${p.sat}: ${value.toFixed(2)} TECU/min @ ${new Date(p.tms).toISOString().slice(11, 16)}Z`,
+              "",
+            ];
+          }}
+        />
+        <ReferenceArea
+          x1={eventStart}
+          x2={eventEnd}
+          y1={0}
+          y2={ymax}
+          strokeOpacity={0}
+          fill="#e63946"
+          fillOpacity={0.1}
+        />
+        <Scatter
+          name="GPS"
+          data={gps}
+          fill="#3b82f6"
+          fillOpacity={0.65}
+          r={2}
+          isAnimationActive={false}
+        />
+        <Scatter
+          name="GLONASS"
+          data={glonass}
+          fill="#ef4444"
+          fillOpacity={0.65}
+          r={2}
+          isAnimationActive={false}
+        />
+      </ScatterChart>
+    </ResponsiveContainer>
   );
 }
 

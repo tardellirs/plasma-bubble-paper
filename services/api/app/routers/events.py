@@ -122,3 +122,58 @@ def event_timeseries(
         if r.get("time") is not None:
             r["time"] = r["time"].isoformat()
     return {"sta": sta.upper(), "sat": sat.upper(), "rows": rows}
+
+
+@router.get("/day-roti")
+def event_day_roti(
+    sta: str = Query(..., description="Station code, e.g. SALU"),
+    date: datetime = Query(..., description="Day to fetch (UTC, anything in the day works)"),
+) -> dict:
+    """Raw per-sample ROTI scatter for one station-day.
+
+    Reads the pyOASIS ``<STA>_<DOY>_<YEAR>_{G|R}_ROTI.txt`` files directly so
+    the map's event drawer can show the same time-domain scatter that
+    ``ROTI_CALC.py`` plots — GPS in one series, GLONASS in another, no
+    smoothing or windowing applied. Used in concert with /events/timeseries
+    (which gives the per-10-min window probability on top).
+    """
+    import pandas as pd
+
+    sta_u = sta.upper()
+    yr = date.year
+    doy = date.timetuple().tm_yday
+    base = (
+        SETTINGS.paths.pyoasis_output
+        / "RINEX"
+        / str(yr)
+        / f"{doy:03d}"
+        / sta_u
+    )
+    points: list[dict] = []
+    for system, label in (("G", "GPS"), ("R", "GLONASS")):
+        path = base / f"{sta_u}_{doy:03d}_{yr}_{system}_ROTI.txt"
+        if not path.exists():
+            continue
+        df = pd.read_csv(path, sep=r"\s+")
+        if df.empty:
+            continue
+        # MJD → UNIX seconds (MJD 40587 == 1970-01-01 UTC).
+        ts = pd.to_datetime((df["MJD"] - 40587) * 86400, unit="s", utc=True)
+        for t, sat, roti in zip(ts, df["SAT"], df["ROTI"], strict=False):
+            points.append(
+                {
+                    "time": t.isoformat(),
+                    "sat": str(sat),
+                    "system": system,
+                    "system_label": label,
+                    "roti": float(roti),
+                }
+            )
+    return {
+        "sta": sta_u,
+        "date": date.date().isoformat(),
+        "year": yr,
+        "doy": doy,
+        "n_points": len(points),
+        "points": points,
+    }
