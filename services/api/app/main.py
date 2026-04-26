@@ -12,6 +12,7 @@ from services.api.app.routers import (
     ingest,
     stations,
     storms,
+    validation,
 )
 
 
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(climatology.router)
     app.include_router(storms.router)
     app.include_router(ingest.router)
+    app.include_router(validation.router)
 
     return app
 
