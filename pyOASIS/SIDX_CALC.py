@@ -241,14 +241,18 @@ def SIDXcalc(station, doy, year, input_folder, destination_directory, show_plot=
             # Replace invalid values with NaN
             df.replace(-999999.999, np.nan, inplace=True)
 
-            # Assign relevant columns for further processing
-            t = df['mjd']                           # Time in Modified Julian Date
-            stec = df['LGF'] / akl                  # Convert LGF to Slant TEC (L1-L2)
-            stec15 = df['LGF15'] / akl15            # Convert LGF15 to Slant TEC (L1-L5)
-            lat = df['latt']                        # Latitude of IPP
-            lon = df['lonn']                        # Longitude of IPP
-            elev = df['elev']                       # Elevation angle
-            hh = df['hh']                           # IPP height
+            # Assign relevant columns for further processing.
+            # Convert to numpy up front: the per-window inner loop below
+            # calls np.mean(series[mask]) ~5× per window × ~2880 windows ×
+            # ~50 sats. Pandas Series indexing+mean has ~50 µs overhead
+            # vs ~1 µs for ndarray, dominating the whole pipeline.
+            t = df['mjd'].to_numpy(dtype=np.float64)            # Time in MJD
+            stec = (df['LGF'] / akl).to_numpy(dtype=np.float64) # Slant TEC (L1-L2)
+            stec15 = (df['LGF15'] / akl15).to_numpy(dtype=np.float64)  # Slant TEC (L1-L5)
+            lat = df['latt'].to_numpy(dtype=np.float64)         # Latitude of IPP
+            lon = df['lonn'].to_numpy(dtype=np.float64)         # Longitude of IPP
+            elev = df['elev'].to_numpy(dtype=np.float64)        # Elevation angle
+            hh = df['hh'].to_numpy(dtype=np.float64)            # IPP height
 
             # Compute time differences between epochs (in seconds)
             d = 86400.0 * np.diff(t)

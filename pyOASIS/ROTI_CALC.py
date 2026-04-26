@@ -255,13 +255,18 @@ def ROTIcalc(estacao,doy,ano,diretorio_principal,destination_directory, show_plo
 
             df.replace(-999999.999, np.nan, inplace=True)
 
-            t = df['mjd']
-            stec = df['LGF'] / akl
+            # Convert to numpy up front: the per-window inner loop below
+            # calls np.mean(series[mask]) ~5× per window × ~2880 windows ×
+            # ~50 sats. Pandas Series indexing+mean has ~50 µs overhead
+            # vs ~1 µs for ndarray, dominating the whole pipeline (cProfile
+            # shows 524k Series.mean calls / 51s on a single station-day).
+            t = df['mjd'].to_numpy(dtype=np.float64)
+            stec = (df['LGF'] / akl).to_numpy(dtype=np.float64)
             #stec15 = df['LGF15'] / akl15
-            lat = df['latt']
-            lon = df['lonn']
-            elev = df['elev']
-            hh = df['hh']
+            lat = df['latt'].to_numpy(dtype=np.float64)
+            lon = df['lonn'].to_numpy(dtype=np.float64)
+            elev = df['elev'].to_numpy(dtype=np.float64)
+            hh = df['hh'].to_numpy(dtype=np.float64)
 
             d = 86400.0*np.diff(t)
             d = ma.masked_values(d,0.0)
