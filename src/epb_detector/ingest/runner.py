@@ -29,6 +29,16 @@ from epb_detector.config import SETTINGS
 
 logger = logging.getLogger(__name__)
 
+# NOTE: An earlier optimisation attempt pre-filtered the input RINEX to
+# GPS + GLONASS only via :mod:`epb_detector.ingest.rinex_filter`. Empirical
+# benchmark on a real 2023 multi-constellation file showed georinex parse
+# at 1.31× faster (saving ~0.6s per call), but pyOASIS.RNX_CLEAN already
+# filters by ``sv.startswith('G' | 'R')`` *before* the per-satellite loop,
+# so the actual job wall-clock (dominated by polynomial fits + screening
+# per satellite) was unchanged. The net job-level speedup was ~0.02%, so
+# we don't wire the filter in. The module is kept as a utility for any
+# future use case that bypasses pyOASIS RNX_CLEAN entirely.
+
 
 def _ensure_output_dirs(year: int, doy: int, sta: str) -> tuple[Path, Path]:
     sta_out = SETTINGS.paths.pyoasis_output / "RINEX" / f"{year}" / f"{doy:03d}" / sta
@@ -85,6 +95,8 @@ def run_pyoasis_pipeline(sta: str, year: int, doy: int) -> dict[str, object]:
     skipped: list[str] = []
     executed: list[str] = []
 
+    rnx_input_dir = rinex_dir
+
     # 1. Orbit interpolation — shared across all stations for the same day.
     if _orbit_table_path(orbit_out, year, doy).exists():
         skipped.append("SP3intp")
@@ -97,7 +109,7 @@ def run_pyoasis_pipeline(sta: str, year: int, doy: int) -> dict[str, object]:
     # file per satellite, and a mid-stage crash leaves the dir in a state
     # that's indistinguishable from "completed but with one missing sat",
     # so a naive skip would silently corrupt the downstream indices.
-    pyOASIS.RNXclean(sta, f"{doy:03d}", str(year), rinex_dir, orbit_out, sta_out)
+    pyOASIS.RNXclean(sta, f"{doy:03d}", str(year), rnx_input_dir, orbit_out, sta_out)
     executed.append("RNXclean")
     pyOASIS.RNXlevelling(sta, sta_out, show_plot=False)
     executed.append("RNXlevelling")
