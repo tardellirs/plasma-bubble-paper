@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from epb_detector.config import SETTINGS
 from epb_detector.external import space_weather
@@ -126,6 +126,117 @@ def by_phase() -> dict:
     )
     grouped["rate"] = grouped["positives"] / grouped["n"]
     return {"rows": grouped.to_dict(orient="records")}
+
+
+_ANALYSIS_PATH = SETTINGS.paths.data_processed / "analysis_v3.json"
+_CATALOG_PATH = SETTINGS.paths.data_processed / "storm_catalog_v3.parquet"
+
+
+@router.get("/v3/analysis")
+def v3_analysis() -> dict:
+    """Whole storms-v3 analysis JSON, served verbatim.
+
+    Powers /findings and the upgraded /storms page. Returns 404-style
+    empty structure when the file isn't on disk yet so the frontend can
+    render a "not yet computed" state without crashing.
+    """
+    import json as _json
+    if not _ANALYSIS_PATH.exists():
+        return {"available": False}
+    data = _json.loads(_ANALYSIS_PATH.read_text())
+    data["available"] = True
+    return data
+
+
+@router.get("/v3/catalog")
+def v3_catalog(intense_only: bool = True) -> list[dict]:
+    """Storm catalog with the v3 enrichments (lt_bin, season, ...)."""
+    if not _CATALOG_PATH.exists():
+        return []
+    df = pd.read_parquet(_CATALOG_PATH)
+    if intense_only and "is_intense_or_stronger" in df.columns:
+        df = df[df["is_intense_or_stronger"]]
+    df = df.copy()
+    for col in ("main_start", "dst_min_time", "recovery_end"):
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    return df.sort_values("dst_min_time").to_dict(orient="records")
+
+
+@router.get("/v3/figure/{name}")
+def v3_figure(name: str):
+    """Serve a PNG figure produced by paper/scripts/make_fig*.py.
+
+    Convenience for the web pages that want to embed a static fig
+    without copying assets into the Next.js public dir at deploy time.
+    Only PNG with a curated allow-list to keep this from becoming a
+    generic file server.
+    """
+    from fastapi.responses import FileResponse
+
+    safe = {
+        f"fig{n:02d}_{stem}"
+        for n, stem in (
+            (12, "storm_vs_quiet_v3"),
+            (13, "storm_lt_polar"),
+            (14, "intensity_curve"),
+            (15, "solar_cycle_strip"),
+            (16, "recovery_duration"),
+            (17, "precursor"),
+            (18, "cycle_modulation"),
+            (19, "station_lag"),
+        )
+    }
+    if name not in safe:
+        raise HTTPException(404, "unknown figure")
+
+    fig_path = SETTINGS.paths.repo_root / "paper" / "figures" / f"{name}.png"
+    if not fig_path.exists():
+        raise HTTPException(404, f"{name} not yet rendered")
+    return FileResponse(fig_path, media_type="image/png")
+
+
+@router.get("/v3/solar-cycle")
+def v3_solar_cycle(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+) -> dict:
+    """Daily SSN series + storm dots — feeds the /storms top strip."""
+    sw_path = SETTINGS.paths.data_space_weather / "kp_ap_f107.parquet"
+    if not sw_path.exists():
+        return {"ssn": [], "storms": []}
+    sw = pd.read_parquet(sw_path)
+    sw["date"] = pd.to_datetime(sw["date"], utc=True)
+    if start is None:
+        start = pd.Timestamp("2014-01-01", tz="UTC").to_pydatetime()
+    if end is None:
+        end = pd.Timestamp.now(tz="UTC").to_pydatetime()
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    sw = sw[(sw["date"] >= start) & (sw["date"] <= end)]
+    ssn_rows = [
+        {"date": r["date"].isoformat(), "ssn": float(r["SN"])}
+        for r in sw[["date", "SN"]].dropna().to_dict(orient="records")
+    ]
+
+    storms_rows: list[dict] = []
+    if _CATALOG_PATH.exists():
+        cat = pd.read_parquet(_CATALOG_PATH)
+        cat["dst_min_time"] = pd.to_datetime(cat["dst_min_time"], utc=True)
+        cat = cat[(cat["dst_min_time"] >= start) & (cat["dst_min_time"] <= end)]
+        for r in cat.to_dict(orient="records"):
+            storms_rows.append(
+                {
+                    "storm_id": int(r["storm_id"]),
+                    "dst_min_time": r["dst_min_time"].isoformat(),
+                    "abs_dst_min": float(abs(r["dst_min_value"])),
+                    "storm_class": r["storm_class"],
+                    "is_intense_or_stronger": bool(r.get("is_intense_or_stronger", False)),
+                }
+            )
+    return {"ssn": ssn_rows, "storms": storms_rows}
 
 
 @router.get("/superposed-epoch")
