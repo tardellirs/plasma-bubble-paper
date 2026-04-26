@@ -14,15 +14,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from epb_detector.config import SETTINGS
-
 router = APIRouter(prefix="/validation", tags=["validation"])
 
 
 def _latest_validation_path() -> Path | None:
-    base = SETTINGS.paths.repo_root.parent / "data"  # /data inside container
-    # Inside docker the data root is /data; SETTINGS.paths.repo_root is /app.
-    # Use the explicit env-driven path instead of guessing.
+    # The validation JSON is written by the offline script directly under
+    # /data inside the api container's volume — not under SETTINGS.paths
+    # because it isn't a feature/label/snapshot artefact.
     candidates = sorted(Path("/data").glob("case_study_validation_v*.json"))
     return candidates[-1] if candidates else None
 
