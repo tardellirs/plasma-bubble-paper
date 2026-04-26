@@ -40,12 +40,27 @@ def _file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _load(snapshot_id: str = "v1") -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+def _resolve_model_id(model_id: str | None) -> str:
+    if model_id:
+        return model_id
+    # Default: latest entry in the registry (sorted by created_at).
+    from epb_detector.models import registry as _registry
+    entries = _registry.load()
+    if not entries:
+        raise RuntimeError("Models registry is empty — train one before rendering fig10.")
+    return max(entries.values(), key=lambda e: e.created_at).model_id
+
+
+def _load(
+    snapshot_id: str = "v1",
+    model_id: str | None = None,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, str]:
     # The full labels parquet (rather than the trimmed snapshot) keeps the
     # storm-context columns we need for splitting by phase.
     full = pd.read_parquet(SETTINGS.paths.data_processed / f"labels_{snapshot_id}.parquet")
-    proba = xgb_model.predict_proba(full, "xgb_v0.2.0")
-    return full, full["label"].astype(int).to_numpy(), proba
+    resolved = _resolve_model_id(model_id)
+    proba = xgb_model.predict_proba(full, resolved)
+    return full, full["label"].astype(int).to_numpy(), proba, resolved
 
 
 def _bootstrap_pr(y: np.ndarray, p: np.ndarray, n: int = 200, seed: int = 0) -> dict:
@@ -64,8 +79,8 @@ def _bootstrap_pr(y: np.ndarray, p: np.ndarray, n: int = 200, seed: int = 0) -> 
     return {"recall": common_recall, "median": med, "lo": lo, "hi": hi}
 
 
-def _render(snapshot_id: str = "v1") -> dict[str, Path]:
-    df, y, p = _load(snapshot_id)
+def _render(snapshot_id: str = "v1", model_id: str | None = None) -> tuple[dict[str, Path], str]:
+    df, y, p, resolved_model = _load(snapshot_id, model_id=model_id)
 
     use("agu")
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8.0, 3.4))
@@ -132,15 +147,15 @@ def _render(snapshot_id: str = "v1") -> dict[str, Path]:
     for path in out.values():
         fig.savefig(path)
     plt.close(fig)
-    return out
+    return out, resolved_model
 
 
-def _update_manifest(paths: dict[str, Path], snapshot_id: str) -> None:
+def _update_manifest(paths: dict[str, Path], snapshot_id: str, model_id: str) -> None:
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"figures": {}}
     manifest.setdefault("figures", {})["fig10_storm_vs_quiet"] = {
         "script": "paper/scripts/make_fig10_storm_vs_quiet.py",
         "snapshot_id": snapshot_id,
-        "model_id": "xgb_v0.2.0",
+        "model_id": model_id,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "files": {ext: str(p.relative_to(REPO)) for ext, p in paths.items()},
         "sha256": {ext: _file_sha256(p) for ext, p in paths.items()},
@@ -148,9 +163,9 @@ def _update_manifest(paths: dict[str, Path], snapshot_id: str) -> None:
     MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True))
 
 
-def main(*, snapshot_id: str = "v1", **_: object) -> None:
-    paths = _render(snapshot_id)
-    _update_manifest(paths, snapshot_id)
+def main(*, snapshot_id: str = "v1", model_id: str | None = None, **_: object) -> None:
+    paths, resolved_model = _render(snapshot_id, model_id=model_id)
+    _update_manifest(paths, snapshot_id, resolved_model)
     for ext, p in paths.items():
         print(f"  {ext.upper()}: {p}")
 

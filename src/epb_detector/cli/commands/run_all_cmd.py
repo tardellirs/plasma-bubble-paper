@@ -69,8 +69,11 @@ def run_all(
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             try:
-                module.main(snapshot_id=snapshot_id)
+                module.main(snapshot_id=snapshot_id, model_id=model_id)
             except TypeError:
-                module.main()
+                try:
+                    module.main(snapshot_id=snapshot_id)
+                except TypeError:
+                    module.main()
 
     rprint("[bold green]done.[/]")
