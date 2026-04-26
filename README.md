@@ -1,260 +1,161 @@
 # Plasma Bubble Paper
 
-Workspace for the Equatorial Plasma Bubble (EPB) detection paper. It bundles
-two Python packages plus a Next.js web app and publication-figure pipeline:
+End-to-end pipeline + ML model + scientific website for detecting **Equatorial
+Plasma Bubbles (EPBs)** from Brazilian RBMC GNSS stations. Built around the
+[pyOASIS](https://github.com/giorgiopicanco/OASIS) ionospheric processing
+toolbox (Picanço et al., 2025), this repo adds bulk ingest, weak-label
+heuristics, an XGBoost classifier with calibration + SHAP, a FastAPI service,
+a public Next.js showcase, and a publication-figure pipeline.
 
-- **`pyOASIS/`** — the upstream Open-Access System for Ionospheric Studies
-  (Picanço et al., 2025, GPS Solutions, *submitted*). Processes RINEX + MGEX
-  SP3 inputs to ROTI / ΔTEC / SIDX / TEC indices. Original README below.
-- **`src/epb_detector/`** — the new layer added in this repo. Bulk ingest,
-  feature extraction, weak labels (Pi 1997 / Cherniak 2014), space-weather
-  context (Kp / ap / Dst / F10.7), XGBoost baseline, snapshot manifest, and
-  literature case-study labels.
-- **`services/api/`** — FastAPI exposing `/events`, `/storms/*`,
-  `/training-data/*`, `/ingest/status`. DuckDB over the parquet outputs.
-- **`web/`** — Next.js 14 + Tailwind + MapLibre + Recharts. Pages: `/`,
-  `/map`, `/storms`, `/dataset`, `/methods`.
-- **`paper/scripts/`** — idempotent figure scripts (matplotlib + AGU /
-  IEEE / `slides_dark` presets) writing PDFs/PNGs/SVGs with a SHA-pinned
-  manifest.
-- **`notebooks/colab_ramp.ipynb`** — self-contained Colab notebook for
-  running a wide ramp on Colab + Google Drive without modifying anything.
+Live site: **<https://plasma-bubble.ifsp.dev>**
 
-Plans live under `docs/`. Architecture and common ops live in `CLAUDE.md`.
+---
+
+## What's in here
+
+```
+plasma-bubble-paper/
+├── pyOASIS/              # upstream RINEX → ROTI / ΔTEC / SIDX / TEC core (vendored)
+├── src/epb_detector/     # the EPB detection layer (this project)
+│   ├── catalog/          # RBMC stations + day selector (equinox / solstice / Kp strata)
+│   ├── ingest/           # downloader, runner, ProcessPoolExecutor orchestrator,
+│   │                     # parquet manifest, RINEX 2.11 pre-filter
+│   ├── io/               # readers, pandera schemas, parquet writers
+│   ├── geo/              # IPP geometry + AACGM quasi-dipole coords
+│   ├── features/         # 10-min sliding windows, statistics, spectral, geometric
+│   ├── labels/           # weak (Pi 1997 / Cherniak 2014) + manual reconciliation
+│   ├── models/           # GroupKFold splits, XGBoost, calibration, SHAP, registry
+│   ├── inference/        # event extraction (contiguous-window merge, dedup)
+│   ├── external/         # Kp/ap/F10.7 (GFZ), Dst (WDC Kyoto), case-study YAML
+│   ├── dataset/          # versioned snapshots (features+labels+splits+card)
+│   └── cli/              # `epb` typer CLI
+├── services/api/         # FastAPI: /events, /storms/*, /training-data/*, /ingest/status
+├── web/                  # Next.js 14 + Tailwind + MapLibre + Recharts + shadcn/ui
+├── paper/                # idempotent figure scripts (matplotlib, AGU/IEEE/slides_dark)
+│   ├── scripts/          # one script per figure/table, SHA-pinned manifest.json
+│   ├── figures/          # generated PDFs (vector) + PNGs (600 dpi) + SVGs
+│   └── tables/           # LaTeX booktabs tables
+├── docker/               # api + web + ingest compose (Traefik, dokploy-network)
+├── tests/                # unit + property (hypothesis) + integration + API + Playwright e2e
+├── notebooks/            # 01_eda, 02_label_audit, 03_baseline, colab_ramp
+└── docs/                 # phase plans (ramp, storms, external labels)
+```
+
+## Pipeline at a glance
+
+```
+RBMC RINEX (IBGE)  +  MGEX SP3 (GFZ/JAX)
+        │
+        ▼
+pyOASIS (RNXclean → leveling → ROTI/ΔTEC/SIDX/TEC)        ← per-satellite arcs
+        │
+        ▼
+features (10-min windows × ~40 features) ── space weather (Kp / ap / Dst / F10.7)
+        │
+        ├─► weak labels (Pi 1997 / Cherniak 2014)
+        ├─► literature case-studies (independent label source)
+        └─► XGBoost (GroupKFold by station-day) → isotonic calibration → SHAP
+        │
+        ▼
+events parquet ──► FastAPI ──► Next.js (map, storms, dataset, methods)
+        │
+        ▼
+paper/figures/*.{pdf,png,svg}  +  paper/tables/*.tex
+```
+
+## Quick start
 
 ```bash
-# Quick local install (Python 3.10+):
+# Python 3.10–3.12 (the runtime container uses 3.11)
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,api,paper]"
 
-# Run a tiny MVP:
-epb ingest mvp                 # 3 stations × 10 days, ~30 min
-epb run-all                    # features → labels → snapshot → train → figures
+# Tiny MVP run (3 stations × 10 days, ~30 min on a laptop)
+epb ingest mvp
+epb run-all                  # features → labels → snapshot → train → figures
 
-# Web app:
-cd web && pnpm install && pnpm build && pnpm dev
+# Web (local dev)
+cd web && pnpm install && pnpm dev   # http://localhost:3000
 ```
 
-Released under CC BY-NC 4.0 (same as upstream OASIS). See `LICENSE`.
+The `epb` CLI is the unified entry point — see `epb --help` for every
+subcommand (`ingest`, `features`, `labels`, `train`, `predict`, `events`,
+`dataset snapshot`, `paper figure`, `serve`, `run-all`).
 
----
+## Compute architecture — three servers
 
+The full Phase 2-A ramp (8 stations × ~77 days ≈ 600 station-days) is split
+across three machines, each picked for what it's good at. None shares
+secrets; each holds only what it needs.
 
-# OASIS: Open-Access System for Ionospheric Studies
+| Server | Role | Hardware | Purpose |
+|---|---|---|---|
+| **Hostinger VPS** | Public web + API | KVM AMD, 4 vCPU, 16 GB RAM | `epb-api` + `epb-web` containers behind Traefik with Let's Encrypt (DNS-01 via Cloudflare). Read-only public site at `plasma-bubble.ifsp.dev`. |
+| **Oracle Ampere A1** | Sustained ingest worker | ARM64 (Neoverse N1), 4 OCPU, 24 GB RAM | Long-running `epb ingest phase2a` with 4 parallel workers. ARM image `epb-detector:arm64-opt`. Disk-aware cleanup loop reaps RNX1+RNX2 intermediates once `*ROTI.txt` lands. |
+| **Hetzner CCX33** | Burst ingest worker | Dedicated AMD EPYC, 8 vCPU, 32 GB RAM | Spun up on demand to crunch the remaining queue ~3× faster than Oracle, then destroyed. AMD64 image `epb-detector:amd64-opt`. Pay-per-hour (~$0.12/h). |
 
-**OASIS** is a modular and open-access Python toolbox for processing multi-frequency GNSS data and computing ionospheric indices. It was developed to overcome limitations of proprietary or non-standardized tools and to promote scientific transparency and reproducibility in ionospheric research.
+Same Docker image (built `arm64-opt` and `amd64-opt`) runs on every host.
+A shared parquet **manifest** (`data/cache/manifest.parquet`) tracks done /
+failed / pending per station-day; rsync between hosts keeps state in sync,
+and the orchestrator's resume logic cheaply skips already-completed stages.
 
-OASIS automates the detection and correction of cycle slips and outliers, performs arc-wise geometry-free (GF) leveling, and derives ionospheric indices directly from calibrated observations, without relying on external products such as Differential Code Biases (DCBs) or vertical TEC maps.
+The image bakes in two pyOASIS optimizations found via cProfile:
 
----
+1. **`pd.Series → np.ndarray` upfront** in `ROTI_CALC` and `SIDX_CALC` —
+   the per-window inner loop calls `np.mean(series[mask])` ~5× per window
+   × ~2880 windows × ~50 sats. Eliminating pandas indexing/mean overhead
+   gave a **3.9× speedup** on SIDX and **2.4×** on ROTI (byte-identical
+   outputs verified by diff).
+2. **SP3 filename pre-filter + atomic temp-then-rename writes** in
+   `SP3_INTERPOLATE` — avoids quadratic scan when the orbits dir grows, and
+   prevents half-written orbit tables from confusing resume logic on a
+   mid-job kill.
 
-## Key Features
-
-- Processes RINEX v2 and v3 files with 15- or 30-second sampling rates.
-- Supports GPS and GLONASS constellations (Galileo and BeiDou coming soon).
-- Fully autonomous detection of data gaps, cycle slips, and outliers.
-- Arc-wise geometry-free leveling of carrier-phase combinations.
-- Computation of ionospheric indices: **ROTI**, **ΔTEC**, and **SIDX**.
-- No dependency on DCBs or global TEC maps.
-
----
-
-## Installation
-
-To install the package, simply run:
+## Tests
 
 ```bash
-pip install pyOASIS
+pytest -q                                 # unit + property + integration + API
+pnpm -C web test                          # vitest
+pnpm -C web exec playwright test          # e2e (chromium): map, storms, dataset, methods, a11y
 ```
 
----
+Coverage targets: 85% on `epb_detector/{io,features,labels}`, 70% elsewhere.
+The integration test runs the full ingest → features → train → predict
+pipeline on a tiny RNX3 fixture in <30 s and asserts a PR-AUC threshold.
 
-## Installation Requirements
+CI: GitHub Actions matrix `py3.10/3.11/3.12` + Node 20 web build + Playwright.
 
-- Python 3.8 or higher
-- Required libraries (see `requirements.txt` for exact versions):
-  - `numpy`
-  - `pandas`
-  - `matplotlib`
-  - `scipy`
-  - `astropy`
-  - `georinex`
-  - `pyproj`
+## Reproducing paper figures
 
-To install all dependencies at once:
+Each figure has a script in `paper/scripts/make_figXX_*.py` that:
+
+1. Reads a SHA-pinned dataset snapshot (`paper/snapshots/`).
+2. Applies the matplotlib theme (AGU / IEEE / `slides_dark`) from `_style.py`.
+3. Writes `paper/figures/figXX_name.{pdf,png,svg}`.
+4. Updates `paper/figures/manifest.json` with `{snapshot_sha, model_id, seed,
+   generated_at}`.
 
 ```bash
-pip install -r requirements.txt
+python paper/scripts/make_all.py          # regenerates everything
+pytest paper/scripts/tests/               # asserts shapes, presence, no NaNs
 ```
 
----
-
-## Example Input Data
-
-This repository includes example input files under the `INPUT/` directory:
-
-- `boav0491.23o` – RINEX observation file for station BOAV, day 049 of 2023.
-- `GFZ0MGXRAP_20230490000_01D_05M_ORB.SP3` – MGEX SP3 precise orbit file for the same day, provided by GFZ.
-
-These files allow you to run a full test of the OASIS pipeline without additional downloads.
-
-To use your own data, simply replace the files in the `INPUT/` folder and update the parameters in `main.py` accordingly.
-
----
-
-### Downloading MGEX Orbit Files (.SP3)
-
-MGEX SP3 orbit files can be downloaded from the [CDDIS archive](https://cddis.nasa.gov/archive/gnss/products/) by accessing the folder corresponding to the desired GPS week.
-A very easy registration is required to access the CDDIS archive. You can register [here](https://urs.earthdata.nasa.gov/users/new).
-
-To convert a calendar date (dd/mm/yyyy) to GPS week and day-of-year (DOY), use [gnsscalendar.com](https://www.gnsscalendar.com/).
-
-Each orbit file follows the naming pattern:
-
-`<prefix>_<YYYY><DOY>0000_01D_05M_ORB.SP3.gz`
-
-Where:
-- `YYYY` is the year,
-- `DOY` is the day of year (001–365/366),
-- The **prefix** depends on the year:
-  - For data **before 2018**, use: `JAX0MGXFIN_`
-  - For data **from 2018 onward**, use: `GFZ0MGXRAP_`
-
-**Example:**
-The orbit file for day 049 of 2023 is:
-
-GFZ0MGXRAP_20230490000_01D_05M_ORB.SP3
-
-After downloading, decompress the `.gz` file and place the resulting `.SP3` inside your `INPUT/` directory.
-
----
-
-## Workflow Summary
-
-1. **Input**: RINEX observation files (e.g., `boav0491.23o`) and MGEX SP3 precise orbit files (e.g., `GFZ0MGXRAP_20230490000_01D_05M_ORB.SP3`).
-2. **Orbit Interpolation**: SP3 orbits are parsed and interpolated to match GNSS epochs.
-3. **IPP Calculation**: Coordinates of the ionospheric pierce point (IPP) are computed for each satellite-receiver pair.
-4. **MW Combination**: The Melbourne–Wübbena combination is applied to detect and correct cycle slips.
-5. **Screening**:
-   - Initial outlier removal based on residuals from ∆MW polynomial fitting.
-   - Fine-grained residual analysis defines mini-arcs based on sign changes.
-6. **Geometry-Free Leveling**: Performed arc-wise on valid L1–L2, L1–L5, or L2–L3 combinations.
-7. **Index Derivation**:
-   - **ROTI**: Standard deviation of the Rate of TEC in 1-minute windows.
-   - **ΔTEC**: Difference between 15-minute and 60-minute moving averages of geometry-free combinations.
-   - **SIDX**: Mean absolute ROT over a 1-minute interval, sensitive to co-seismic and auroral disturbances.
-
----
-
-## How to Run
-
-1. Place the required RINEX observation files (`.yyo`) and MGEX SP3 orbit files (`.SP3`) inside the `INPUT/` directory.
-2. In `main.py`, define the station code, year, day of year (DOY), and paths to the input and output directories.
-3. Run the pipeline:
-
-```bash
-python main.py
-```
-
-4. Results are saved in structured output folders, organized by station and satellite.
-
----
-
-## Directory Structure
-
-- `SP3_INTERPOLATE.py` – Interpolates MGEX SP3 precise orbit files and generates tabulated satellite positions in the format `ORBITS_YYYY_DOY.SP3`.
-- `RNX_CLEAN.py` – Parses RINEX observation files and produces initial GNSS datasets organized by satellite and station. Assigns ionospheric pierce point (IPP) coordinates and flags preliminary gaps, outliers, and cycle slips. Output: `STAT_SAT_DOY_YYYY.RNX1`.
-- `RNX_SCREENING.py` – Refines arc definitions and detects outliers and cycle slips using ∆MW residuals and polynomial fitting. Output: `STAT_SAT_DOY_YYYY.RNX2`.
-- `RNX_LEVELLING.py` – Performs arc-wise geometry-free leveling on refined data arcs. Output: `STAT_SAT_DOY_YYYY.RNX3`.
-- `ROTI_CALC.py` – Calculates the Rate of TEC Index (ROTI) from leveled geometry-free combinations in `.RNX3`.
-- `DTEC_CALC.py` – Calculates the TEC anomaly index (ΔTEC) using 15-minute and 60-minute moving averages of leveled combinations.
-- `SIDX_CALC.py` – Calculates the Sudden Ionospheric Disturbance Index (SIDX) as the mean absolute value of ROT in 1-minute windows.
-- `linear_combinations.py`, `gnss_freqs.py`, `settings.py`, `glonass_channels.dat`, etc. – Supporting modules for GNSS frequency combinations, coordinate transformations, and IPP computation.
-
----
-
-## Outputs
-
-- Time series of arc-wise leveled geometry-free combinations for each GPS and GLONASS satellite.
-- ROTI, ΔTEC, and SIDX indices computed per satellite and station.
-- Visualizations of geometry-free combinations and derived ionospheric indices.
-
----
-
-## Geometry-Free Leveling Example
-
-<p align="center">
-  <img src="img/levelling_example.png" alt="Levelled GF Example" width="700"/>
-</p>
-
-*Example of arc-wise geometry-free leveling for GNSS signals at station BOAV (year 2023, day 049), using L1–L2 and L1–L5 combinations for GPS, and L1–L2 and L2–L3 for GLONASS. Each curve represents a leveled geometry-free combination over a continuous observation arc.*
-
----
-
-## ROTI Example
-
-<p align="center">
-  <img src="img/roti_example.png" alt="ROTI Example" width="700"/>
-</p>
-
-*Example of Rate of TEC Index (ROTI) for GPS (L1–L2, L1–L5) and GLONASS (L1–L2, L2–L3) signals at station BOAV (year 2023, doy 049). This plot highlights ionospheric irregularities typically associated with nighttime equatorial plasma bubbles. Elevated ROTI values are observed between 00:00 and 07:00 UT, and again after 23:00 UT, consistent with post-sunset and pre-dawn plasma bubble activity.*
-
----
-
-## ΔTEC Example
-<p align="center"> <img src="img/dtec_example.png" alt="ΔTEC Example" width="700"/> </p>
-
-Example of TEC anomaly index (ΔTEC) for GPS (L1–L2, L1–L5) and GLONASS (L1–L2) signals at station TONO (year 2024, doy 132). The ΔTEC index highlights positive and negative anomalies, particularly associated with wave-like ionospheric disturbances and density gradients observed during the May 2024 geomagnetic storm (the Mother’s Day Storm).
-
----
-
-## SIDX Example
-<p align="center"> <img src="img/sidx_example.png" alt="SIDX Example" width="700"/> </p>
-
-Example of the Sudden Ionospheric Disturbance Index (SIDX) for GPS at station PTBB (year 2017, day 249). The intense SIDX enhancements observed around 09:00 UT and 12:00 UT are associated with X-class solar flares during the September 2017 geomagnetic storm.
-
----
-
-## Cite This Work
-
-If you use this software in your research, please cite:
-
-<details>
-<summary><strong>APA</strong></summary>
-
-Picanço, G.A.S., Fagundes, P.R., Prol, F.S., Denardini, C.M., Mendoza, L.P.O., Pillat, V.G., Rodrigues, I., Christovam, A.L., Meza, A.M., Natali, M.P., Romero-Hernández, E., Aguirre-Gutierrez, R., Agyei-Yeboah, E., & Muella, M.T.A.H. (2025). *Introducing OASIS: An Open-Access System for Ionospheric Studies*. GPS Solutions. *(submitted)*
-
-</details>
-
-<details>
-<summary><strong>ABNT</strong></summary>
-
-PICANÇO, G.A.S.; FAGUNDES, P.R.; PROL, F.S.; DENARDINI, C.M.; MENDOZA, L.P.O.; PILLAT, V.G.; RODRIGUES, I.; CHRISTOVAM, A.L.; MEZA, A.M.; NATALI, M.P.; ROMERO-HERNÁNDEZ, E.; AGUIRRE-GUTIERREZ, R.; AGYEI-YEBOAH, E.; MUELLA, M.T.A.H. Introducing OASIS: An Open-Access System for Ionospheric Studies. *GPS Solutions*, 2025. Manuscrito submetido para publicação.
-
-</details>
-
-<details>
-<summary><strong>GitHub Repository</strong></summary>
-
-Picanço, G. A. S. (2025). **OASIS: Open-Access System for Ionospheric Studies** [Software]. GitHub.  
-Available at: https://github.com/giorgiopicanco/OASIS  
-Accessed: April 30, 2025.
-
-</details>
-
----
-
-## Contact
-
-Developed by Giorgio Picanço (Ph.D. in Space Geophysics).
-  
-For questions or contributions, please visit:  
-[https://github.com/giorgiopicanco/OASIS](https://github.com/giorgiopicanco/OASIS)  
-or email: giorgiopicanco@gmail.com
-
----
+Slides + poster source live in `paper/conference/` (Marp + Inkscape).
 
 ## License
 
-The OASIS toolbox is open-source and free to use under the Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) license.
-You are free to use, adapt, and share this software for non-commercial purposes, as long as proper credit is given.
+Same as upstream OASIS: **CC BY-NC 4.0** (non-commercial). See `LICENSE`.
+
+## Citation
+
+```bibtex
+@article{picanco2025oasis,
+  title   = {OASIS: Open-Access System for Ionospheric Studies},
+  author  = {Picanço, G. and others},
+  journal = {GPS Solutions},
+  year    = {2025},
+  note    = {submitted}
+}
+```
+
+A `CITATION.cff` is provided for GitHub's citation widget.
