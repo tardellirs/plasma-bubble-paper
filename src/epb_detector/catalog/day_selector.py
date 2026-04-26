@@ -91,3 +91,98 @@ PHASE2A_DAYS: tuple[DayKey, ...] = tuple(
 
 def phase2a_days() -> tuple[DayKey, ...]:
     return PHASE2A_DAYS
+
+
+def storm_stratified_days(
+    catalog_path: str,
+    *,
+    pre_days: int = 2,
+    post_days: int = 3,
+    quiet_doy_window: int = 15,
+    require_intense: bool = True,
+) -> list[DayKey]:
+    """Build a storm-stratified ingest plan from a storm catalog parquet.
+
+    For every storm in ``catalog_path`` (default: ``storm_catalog_v3.parquet``)
+    that meets the intensity gate, emit:
+
+    - ``pre_days + 1 + post_days`` storm-context days centered on the
+      Dst-minimum date.
+    - The same number of **quiet matched control days**: same DOY ± a few
+      days in the *adjacent* year, screened to land in a calendar window
+      where (a) Kp stayed below 4 all day and (b) no other catalog storm
+      sits within ±5 days. Falls back gracefully if no quiet match exists.
+
+    The output is deduplicated and sorted; the orchestrator's manifest
+    handles re-run safety.
+    """
+    import pandas as pd
+
+    cat = pd.read_parquet(catalog_path)
+    if require_intense and "is_intense_or_stronger" in cat.columns:
+        cat = cat[cat["is_intense_or_stronger"]]
+    if cat.empty:
+        return []
+
+    # Storm windows — easy.
+    storm_keys: list[DayKey] = []
+    storm_dates: set[date] = set()
+    for row in cat.itertuples():
+        d0 = pd.Timestamp(row.dst_min_time).tz_convert("UTC").date()
+        for offset in range(-pre_days, post_days + 1):
+            d = d0 + timedelta(days=offset)
+            doy = (d - date(d.year, 1, 1)).days + 1
+            note = f"storm{row.storm_id}_d{offset:+d}_{row.storm_class}"
+            storm_keys.append(DayKey(d.year, doy, note))
+            storm_dates.add(d)
+
+    # Quiet matched controls — for each storm date, find a quiet calendar day
+    # within ± `quiet_doy_window` days of the same DOY in the adjacent year
+    # that doesn't fall within ±5 d of any other storm.
+    forbidden = set()
+    for row in cat.itertuples():
+        d0 = pd.Timestamp(row.dst_min_time).tz_convert("UTC").date()
+        for offset in range(-5, 6):
+            forbidden.add(d0 + timedelta(days=offset))
+
+    quiet_keys: list[DayKey] = []
+    span_yrs = sorted({d.year for d in storm_dates})
+    if not span_yrs:
+        return []
+    yr_lo, yr_hi = span_yrs[0], span_yrs[-1]
+
+    for storm_date in sorted(storm_dates):
+        # Try +1 yr first, then -1 yr, then +2/-2.
+        match = None
+        for delta_y in (+1, -1, +2, -2):
+            cand_year = storm_date.year + delta_y
+            if not (yr_lo <= cand_year <= yr_hi + 1):
+                continue
+            try:
+                cand0 = date(cand_year, storm_date.month, storm_date.day)
+            except ValueError:
+                continue
+            for off in range(0, quiet_doy_window):
+                for sign in (+1, -1):
+                    cand = cand0 + timedelta(days=sign * off)
+                    if cand in forbidden or cand in storm_dates:
+                        continue
+                    match = cand
+                    break
+                if match:
+                    break
+            if match:
+                break
+        if match:
+            doy = (match - date(match.year, 1, 1)).days + 1
+            quiet_keys.append(
+                DayKey(match.year, doy, f"quiet-match-of-{storm_date.isoformat()}")
+            )
+
+    # Dedupe across all keys (storm + quiet) on (year, doy).
+    seen: dict[tuple[int, int], DayKey] = {}
+    for k in storm_keys + quiet_keys:
+        key = (k.year, k.doy)
+        if key not in seen:
+            seen[key] = k
+    return sorted(seen.values(), key=lambda k: (k.year, k.doy))

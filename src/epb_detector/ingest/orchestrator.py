@@ -75,6 +75,19 @@ def jobs_from_phase2a() -> list[IngestJob]:
     return [IngestJob(s.id, d.year, d.doy) for s in sts for d in days]
 
 
+def jobs_from_storm_stratified(catalog_path: str) -> list[IngestJob]:
+    """Build the storm-stratified job list from a storm catalog parquet.
+
+    Same 8 stations as Phase 2-A; days come from
+    :func:`day_selector.storm_stratified_days`.
+    """
+    from epb_detector.catalog.day_selector import storm_stratified_days
+
+    sts: list[StationMeta] = phase2a_stations()
+    days: list[DayKey] = storm_stratified_days(catalog_path)
+    return [IngestJob(s.id, d.year, d.doy) for s in sts for d in days]
+
+
 def run_jobs(jobs: list[IngestJob], force: bool = False) -> list[cache.IngestRecord]:
     pending: list[IngestJob] = []
     skipped: list[cache.IngestRecord] = []

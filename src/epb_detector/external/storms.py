@@ -153,6 +153,98 @@ def annotate_storm_phase(sw: pd.DataFrame, events: list[StormEvent]) -> pd.DataF
     return out
 
 
+def enrich_storm_catalog(
+    events: list[StormEvent],
+    sw: pd.DataFrame,
+    *,
+    brazil_lon_deg: float = -45.0,
+    intense_threshold_nt: float = -100.0,
+) -> pd.DataFrame:
+    """Build a per-event catalogue with the columns the storm-stratified
+    analysis needs.
+
+    For each detected storm we add:
+    - ``dst_min_lt_brazil`` — local time at the Brazilian sector when the
+      Dst minimum was reached (UTC + lon/15°, mod 24).
+    - ``lt_bin`` — pre-sunset / PRE / post-midnight / morning.
+    - ``season`` — DJF / MAM / JJA / SON (southern hemisphere convention).
+    - ``recovery_duration_hours`` — from ``dst_min_time`` until Dst returns
+      above −30 nT.
+    - ``f107_at_min`` — F10.7 observed flux on the day of the minimum.
+    - ``solar_cycle_phase`` — F107 monthly mean normalised to [0, 1] across
+      the input range; 1 ≈ solar max conditions for the supplied window.
+    - ``is_intense_or_stronger`` — bool, ``dst_min_value <= intense_threshold_nt``.
+    """
+    if not events:
+        return pd.DataFrame(
+            columns=[
+                "storm_id", "main_start", "dst_min_time", "recovery_end",
+                "dst_min_value", "storm_class", "dst_min_lt_brazil", "lt_bin",
+                "season", "recovery_duration_hours", "f107_at_min",
+                "solar_cycle_phase", "is_intense_or_stronger",
+            ]
+        )
+
+    f107_series = (
+        sw[["time", "F107obs"]].dropna().set_index("time")["F107obs"]
+        if "F107obs" in sw.columns
+        else None
+    )
+    if f107_series is not None and not f107_series.empty:
+        f107_max = float(f107_series.resample("30D").mean().max())
+    else:
+        f107_max = float("nan")
+
+    rows: list[dict[str, object]] = []
+    for ev in events:
+        utc_hour = ev.dst_min_time.hour + ev.dst_min_time.minute / 60.0
+        lt = (utc_hour + brazil_lon_deg / 15.0) % 24.0
+        rows.append(
+            {
+                **ev.to_dict(),
+                "dst_min_lt_brazil": lt,
+                "lt_bin": _lt_bin(lt),
+                "season": _season_southern(ev.dst_min_time),
+                "recovery_duration_hours": (
+                    (ev.recovery_end - ev.dst_min_time).total_seconds() / 3600.0
+                ),
+                "f107_at_min": (
+                    float(f107_series.asof(ev.dst_min_time))
+                    if f107_series is not None
+                    else float("nan")
+                ),
+                "solar_cycle_phase": (
+                    float(f107_series.asof(ev.dst_min_time)) / f107_max
+                    if (f107_series is not None and f107_max == f107_max and f107_max > 0)
+                    else float("nan")
+                ),
+                "is_intense_or_stronger": ev.dst_min_value <= intense_threshold_nt,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _lt_bin(lt_hours: float) -> str:
+    if 12 <= lt_hours < 17:
+        return "pre_sunset"
+    if 17 <= lt_hours < 22:
+        return "PRE"
+    if lt_hours >= 22 or lt_hours < 6:
+        return "post_midnight"
+    return "morning"
+
+
+def _season_southern(t: pd.Timestamp) -> str:
+    m = t.month
+    if m in (12, 1, 2):
+        return "DJF"
+    if m in (3, 4, 5):
+        return "MAM"
+    if m in (6, 7, 8):
+        return "JJA"
+    return "SON"
+
+
 def attach_to_features(
     features: pd.DataFrame, sw: pd.DataFrame
 ) -> pd.DataFrame:

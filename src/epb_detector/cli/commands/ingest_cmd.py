@@ -14,6 +14,7 @@ from epb_detector.ingest.orchestrator import (
     IngestJob,
     jobs_from_mvp,
     jobs_from_phase2a,
+    jobs_from_storm_stratified,
     run_jobs,
 )
 
@@ -72,6 +73,42 @@ def run_phase2a(
         f"[bold]Phase 2-A[/]: {len(jobs)} station-days  "
         f"({len({j.sta for j in jobs})} stations × {len({(j.year, j.doy) for j in jobs})} days)"
     )
+    recs = run_jobs(jobs, force=force)
+    ok = sum(r.status == "ok" for r in recs)
+    fail = sum(r.status == "failed" for r in recs)
+    skipped_count = sum(r.status == "skipped" for r in recs)
+    rprint(f"[bold]Done[/]: ok={ok} failed={fail} skipped={skipped_count} total={len(recs)}")
+
+
+@app.command("storm-stratified")
+def run_storm_stratified(
+    catalog: str = typer.Option(
+        "data/processed/storm_catalog_v3.parquet",
+        help="Path to storm catalog parquet built by `epb storms detect`.",
+    ),
+    skip: str = typer.Option(
+        "BOAV,MAPA,PALM",
+        "--skip",
+        help=(
+            "Comma-separated stations to exclude. Default skips the three "
+            "stations that consistently fail in IBGE archive."
+        ),
+    ),
+    force: bool = False,
+) -> None:
+    """Run the storm-stratified preset (~2,800 station-days, see plan v3)."""
+    skip_set = {s.strip().upper() for s in skip.split(",") if s.strip()}
+    all_jobs = jobs_from_storm_stratified(catalog)
+    jobs = [j for j in all_jobs if j.sta not in skip_set]
+    rprint(
+        f"[bold]Storm-stratified[/]: {len(jobs)} station-days "
+        f"({len({j.sta for j in jobs})} stations × {len({(j.year, j.doy) for j in jobs})} days)"
+    )
+    if skip_set:
+        rprint(
+            f"[yellow]Skipping[/] stations: {sorted(skip_set)}  "
+            f"(removed {len(all_jobs) - len(jobs)} jobs)"
+        )
     recs = run_jobs(jobs, force=force)
     ok = sum(r.status == "ok" for r in recs)
     fail = sum(r.status == "failed" for r in recs)

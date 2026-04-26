@@ -13,6 +13,7 @@ from epb_detector.cli.commands import (
     paper_cmd,
     predict_cmd,
     run_all_cmd,
+    storms_cmd,
     train_cmd,
 )
 
@@ -31,6 +32,7 @@ app.add_typer(events_cmd.app, name="events", help="Convert window scores into bu
 app.add_typer(dataset_cmd.app, name="dataset", help="Snapshot the labeled dataset for ML/paper.")
 app.add_typer(paper_cmd.app, name="paper", help="Render publication figures.")
 app.add_typer(run_all_cmd.app, name="run-all", help="Post-ingest pipeline: features→labels→snapshot→train→figures.")
+app.add_typer(storms_cmd.app, name="storms", help="Build geomagnetic-storm catalogues for analysis.")
 
 
 if __name__ == "__main__":  # pragma: no cover
