@@ -56,6 +56,7 @@ test-results/
 
 # Claude Code local state
 .claude/
+CLAUDE.md
 
 # Host-specific docker overrides (may carry hostnames or secrets)
 docker/compose.override.yml
