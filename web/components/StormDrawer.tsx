@@ -88,11 +88,11 @@ export function StormDrawer() {
         const [tlRes, evRes] = await Promise.all([
           fetch(
             `${API}/storms/timeline?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}&step_hours=1`,
-            { cache: "no-store" },
+            { cache: "default" },
           ),
           fetch(
             `${API}/events?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}&limit=10000`,
-            { cache: "no-store" },
+            { cache: "default" },
           ),
         ]);
         const tl = await tlRes.json();

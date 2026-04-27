@@ -9,7 +9,9 @@ import {
 import { StormDrawer } from "@/components/StormDrawer";
 import { Suspense } from "react";
 
-export const revalidate = 0;
+// Cache the SSR payload for 60 s — none of these data sources change in
+// real-time. Repeat visits within the window get instant render.
+export const revalidate = 60;
 
 type Q1 = {
   storm_rate_mean: number;

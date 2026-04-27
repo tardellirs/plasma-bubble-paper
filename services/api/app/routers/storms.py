@@ -7,6 +7,7 @@ v1 labels parquet.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -24,11 +25,18 @@ def _latest_labels_path() -> Path | None:
     return candidates[-1] if candidates else None
 
 
+@lru_cache(maxsize=1)
+def _load_labels_cached(_mtime_key: tuple[str, float]) -> pd.DataFrame:
+    """Cached parquet read keyed by (path, mtime). Auto-invalidates on rewrite."""
+    path, _ = _mtime_key
+    return pd.read_parquet(path)
+
+
 def _load_labels() -> pd.DataFrame:
     path = _latest_labels_path()
     if path is None or not path.exists():
         return pd.DataFrame()
-    return pd.read_parquet(path)
+    return _load_labels_cached((str(path), path.stat().st_mtime))
 
 
 @router.get("/timeline")
@@ -73,9 +81,8 @@ def timeline(
     }
 
 
-@router.get("/catalog")
-def catalog() -> list[dict]:
-    """Discrete storm events with their Dst min and phase boundaries."""
+@lru_cache(maxsize=1)
+def _catalog_payload(_mtime_key: tuple[str, float]) -> list[dict]:
     df = _load_labels()
     if df.empty or "storm_id" not in df.columns:
         return []
@@ -110,6 +117,20 @@ def catalog() -> list[dict]:
         }
         for r in grouped.itertuples()
     ]
+
+
+@router.get("/catalog")
+def catalog() -> list[dict]:
+    """Discrete storm events with their Dst min and phase boundaries.
+
+    Result is cached per labels-parquet mtime; first call after ingest
+    pays the groupby cost (~5 s on 1.7M rows), subsequent calls are
+    served from memory.
+    """
+    path = _latest_labels_path()
+    if path is None or not path.exists():
+        return []
+    return _catalog_payload((str(path), path.stat().st_mtime))
 
 
 @router.get("/by-phase")
@@ -148,19 +169,25 @@ def v3_analysis() -> dict:
     return data
 
 
-@router.get("/v3/catalog")
-def v3_catalog(intense_only: bool = True) -> list[dict]:
-    """Storm catalog with the v3 enrichments (lt_bin, season, ...)."""
-    if not _CATALOG_PATH.exists():
-        return []
+@lru_cache(maxsize=1)
+def _v3_catalog_records(_mtime_key: float) -> list[dict]:
     df = pd.read_parquet(_CATALOG_PATH)
-    if intense_only and "is_intense_or_stronger" in df.columns:
-        df = df[df["is_intense_or_stronger"]]
     df = df.copy()
     for col in ("main_start", "dst_min_time", "recovery_end"):
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%S+00:00")
     return df.sort_values("dst_min_time").to_dict(orient="records")
+
+
+@router.get("/v3/catalog")
+def v3_catalog(intense_only: bool = True) -> list[dict]:
+    """Storm catalog with the v3 enrichments (lt_bin, season, ...)."""
+    if not _CATALOG_PATH.exists():
+        return []
+    rows = _v3_catalog_records(_CATALOG_PATH.stat().st_mtime)
+    if intense_only:
+        rows = [r for r in rows if r.get("is_intense_or_stronger")]
+    return rows
 
 
 @router.get("/v3/figure/{name}")
@@ -196,29 +223,32 @@ def v3_figure(name: str):
     return FileResponse(fig_path, media_type="image/png")
 
 
-@router.get("/v3/solar-cycle")
-def v3_solar_cycle(
-    start: datetime | None = Query(default=None),
-    end: datetime | None = Query(default=None),
+@lru_cache(maxsize=4)
+def _v3_solar_cycle_payload(
+    _sw_mtime: float, _cat_mtime: float, start_iso: str, end_iso: str
 ) -> dict:
-    """Daily SSN series + storm dots — feeds the /storms top strip."""
+    """Cached SSN line + storm dots, monthly down-sampled to keep the
+    payload small. The chart was already aggregating to monthly on the
+    client; we now do it server-side so the wire payload drops by ~30×.
+    """
     sw_path = SETTINGS.paths.data_space_weather / "kp_ap_f107.parquet"
-    if not sw_path.exists():
-        return {"ssn": [], "storms": []}
     sw = pd.read_parquet(sw_path)
     sw["date"] = pd.to_datetime(sw["date"], utc=True)
-    if start is None:
-        start = pd.Timestamp("2014-01-01", tz="UTC").to_pydatetime()
-    if end is None:
-        end = pd.Timestamp.now(tz="UTC").to_pydatetime()
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=timezone.utc)
-    if end.tzinfo is None:
-        end = end.replace(tzinfo=timezone.utc)
+    start = pd.Timestamp(start_iso)
+    end = pd.Timestamp(end_iso)
     sw = sw[(sw["date"] >= start) & (sw["date"] <= end)]
+
+    # Monthly mean SSN — 132 points for 11 years instead of 4498 daily rows.
+    sw_month = (
+        sw.dropna(subset=["SN"])
+        .assign(_m=sw["date"].dt.to_period("M").dt.to_timestamp(tz="UTC"))
+        .groupby("_m", as_index=False)["SN"]
+        .mean()
+        .rename(columns={"_m": "date"})
+    )
     ssn_rows = [
-        {"date": r["date"].isoformat(), "ssn": float(r["SN"])}
-        for r in sw[["date", "SN"]].dropna().to_dict(orient="records")
+        {"date": pd.Timestamp(r["date"]).isoformat(), "ssn": float(r["SN"])}
+        for r in sw_month.to_dict(orient="records")
     ]
 
     storms_rows: list[dict] = []
@@ -237,6 +267,33 @@ def v3_solar_cycle(
                 }
             )
     return {"ssn": ssn_rows, "storms": storms_rows}
+
+
+@router.get("/v3/solar-cycle")
+def v3_solar_cycle(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
+) -> dict:
+    """Monthly SSN series + storm dots — feeds the /storms top strip.
+
+    Result is cached per (sw-parquet mtime, catalog mtime, range).
+    """
+    sw_path = SETTINGS.paths.data_space_weather / "kp_ap_f107.parquet"
+    if not sw_path.exists():
+        return {"ssn": [], "storms": []}
+    if start is None:
+        start = pd.Timestamp("2014-01-01", tz="UTC").to_pydatetime()
+    if end is None:
+        end = pd.Timestamp.now(tz="UTC").to_pydatetime()
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    sw_mtime = sw_path.stat().st_mtime
+    cat_mtime = _CATALOG_PATH.stat().st_mtime if _CATALOG_PATH.exists() else 0.0
+    return _v3_solar_cycle_payload(
+        sw_mtime, cat_mtime, start.isoformat(), end.isoformat()
+    )
 
 
 @router.get("/superposed-epoch")
