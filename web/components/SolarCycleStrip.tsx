@@ -161,6 +161,7 @@ export function SolarCycleStrip({
               data={stormSeries}
               dataKey="abs_dst"
               name="|Dst|"
+              fill="#E63946"
               isAnimationActive={false}
               shape={(props: {
                 cx?: number;
