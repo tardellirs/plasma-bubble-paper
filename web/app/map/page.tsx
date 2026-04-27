@@ -1,7 +1,10 @@
 import dynamic from "next/dynamic";
 import { fetchOrNull, type EventRow, type Station } from "@/lib/api";
 
-export const revalidate = 0;
+// Cache the SSR payload (events list + stations) for 60 s. Repeat
+// visits inside the window skip the API entirely. The /events response
+// is ~770 KB gzipped; without ISR it dominates page load.
+export const revalidate = 60;
 
 const MapDeck = dynamic(() => import("@/components/MapDeck"), {
   ssr: false,

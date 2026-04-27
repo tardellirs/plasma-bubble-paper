@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 
 import duckdb
@@ -82,31 +82,45 @@ def _filter_to_roti_days(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _query_events(where_sql: str, params: list, limit: int) -> list[dict]:
+@lru_cache(maxsize=1)
+def _all_deduped_events_cached(
+    _parquets_mtime_key: tuple, _roti_mtime: float, roti_only: bool
+) -> list[dict]:
+    """All events from every events_v*.parquet, dedup'd across versions
+    and (optionally) filtered to station-days with raw ROTI on disk.
+
+    Cache key = parquet mtimes + ROTI dir mtime + roti_only flag.
+    Per-request filtering (station / t0 / t1 / min_prob / limit) is
+    cheap once we have this list in memory — 15k rows iterate in single-
+    digit milliseconds vs 700 ms re-querying DuckDB.
+    """
     pattern = str(EVENT_GLOB)
-    if not list(EVENT_GLOB.parent.glob("*.parquet")):
-        return []
     con = duckdb.connect()
     try:
-        # The events folder may carry multiple snapshot versions
-        # (events_v2.parquet for Phase 2-A, events_v3.parquet for the
-        # storm-stratified ingest). They overlap on the days that fell
-        # in both selectors. Dedup by (sta, sat, start) and keep the
-        # highest-probability row so we don't double-count.
         sql = f"""
             SELECT *
             FROM parquet_scan('{pattern}')
-            {where_sql}
             QUALIFY ROW_NUMBER() OVER (
                 PARTITION BY sta, sat, start
                 ORDER BY peak_probability DESC
             ) = 1
             ORDER BY start
-            LIMIT {int(limit)}
         """
-        return con.execute(sql, params).df().to_dict(orient="records")
+        rows = con.execute(sql).df().to_dict(orient="records")
     finally:
         con.close()
+    if roti_only:
+        rows = _filter_to_roti_days(rows)
+    return rows
+
+
+def _all_deduped_events(roti_only: bool) -> list[dict]:
+    parquets = sorted(EVENT_GLOB.parent.glob("*.parquet"))
+    if not parquets:
+        return []
+    parquets_key = tuple((str(p), p.stat().st_mtime) for p in parquets)
+    roti_mtime = ROTI_ROOT.stat().st_mtime if ROTI_ROOT.exists() else 0.0
+    return _all_deduped_events_cached(parquets_key, roti_mtime, roti_only)
 
 
 @router.get("")
@@ -125,50 +139,42 @@ def list_events(
         ),
     ),
 ) -> list[dict]:
-    clauses: list[str] = ["peak_probability >= ?"]
-    params: list = [min_prob]
-    if station:
-        clauses.append("sta = ?")
-        params.append(station.upper())
-    if t0:
-        clauses.append("start >= ?")
-        params.append(t0)
-    if t1:
-        clauses.append("start <= ?")
-        params.append(t1)
-    where_sql = "WHERE " + " AND ".join(clauses) if clauses else ""
-    rows = _query_events(where_sql, params, limit)
-    if roti_only:
-        rows = _filter_to_roti_days(rows)
-    return rows
+    rows = _all_deduped_events(roti_only)
+    sta_u = station.upper() if station else None
+    # Normalize tz-naive datetimes from query params to UTC so comparisons
+    # with the tz-aware event timestamps don't raise.
+    if t0 and t0.tzinfo is None:
+        t0 = t0.replace(tzinfo=timezone.utc)
+    if t1 and t1.tzinfo is None:
+        t1 = t1.replace(tzinfo=timezone.utc)
+    out: list[dict] = []
+    for r in rows:
+        if r.get("peak_probability", 0.0) < min_prob:
+            continue
+        if sta_u and r.get("sta") != sta_u:
+            continue
+        if t0 or t1:
+            ts = r.get("start")
+            if hasattr(ts, "to_pydatetime"):
+                ts = ts.to_pydatetime()
+            if t0 and ts < t0:
+                continue
+            if t1 and ts > t1:
+                continue
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
 
 
 @router.get("/summary")
 def events_summary(roti_only: bool = Query(default=True)) -> dict:
     """Aggregate counts useful for the homepage hero.
 
-    Mirrors /events defaults: dedupes across v2/v3 parquets and (by
-    default) only counts events whose station-day has a raw ROTI on
-    disk so the home-page total matches what the map actually plots.
+    Reuses the same cached in-memory list as /events so first hit pays
+    the parquet+filter cost once, subsequent calls are instant.
     """
-    if not list(EVENT_GLOB.parent.glob("*.parquet")):
-        return {"total": 0, "by_station": {}}
-    con = duckdb.connect()
-    try:
-        rows = con.execute(
-            f"""
-            SELECT sta, sat, start, peak_probability
-            FROM parquet_scan('{EVENT_GLOB}')
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY sta, sat, start
-                ORDER BY peak_probability DESC
-            ) = 1
-            """
-        ).df().to_dict(orient="records")
-    finally:
-        con.close()
-    if roti_only:
-        rows = _filter_to_roti_days(rows)
+    rows = _all_deduped_events(roti_only)
     by_sta: dict[str, int] = {}
     for r in rows:
         by_sta[r["sta"]] = by_sta.get(r["sta"], 0) + 1
