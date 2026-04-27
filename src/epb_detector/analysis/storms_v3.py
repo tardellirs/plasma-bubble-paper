@@ -518,6 +518,112 @@ def q7_inter_station_lag(
 
 
 # ---------------------------------------------------------------------------
+# Q8 — storm-onset longitude (which sector was at sunset when Dst-min hit)
+# ---------------------------------------------------------------------------
+
+
+def q8_storm_onset_longitude(
+    pred: pd.DataFrame,
+    catalog: pd.DataFrame,
+    *,
+    threshold: float = 0.5,
+    night_only: bool = True,
+    n_boot: int = 1000,
+) -> dict:
+    """Per-storm Brazilian-sector EPB rate stratified by which longitude
+    sector was at sunset when Dst-min occurred.
+
+    Bins on Dst-min UT-hour so each sector's PRE window is hot:
+      - asia    (UT 06–14): sunset over Asia/India
+      - atlantic(UT 14–22): sunset over the Atlantic / Brazilian terminator
+      - pacific (UT 22–06): sunset over the Pacific
+    Tests whether prompt-penetration coupling depends on global LT
+    structure and not just local LT (Q2). Note the Atlantic bin overlaps
+    with Q2's PRE LT bin — they answer the same physics from different
+    angles.
+    """
+    intense = catalog[catalog.get("is_intense_or_stronger", False)].copy()
+    if intense.empty:
+        return {"error": "no intense storms"}
+    intense["dst_min_ut_hour"] = (
+        pd.to_datetime(intense["dst_min_time"], utc=True).dt.hour
+    )
+
+    def _sector(h: int) -> str:
+        if 6 <= h < 14:
+            return "asia"
+        if 14 <= h < 22:
+            return "atlantic"
+        return "pacific"
+
+    intense["lon_sector"] = intense["dst_min_ut_hour"].map(_sector)
+
+    storm_ids = set(intense["storm_id"].astype(int))
+    rates_list = _rate_per_storm(
+        pred, storm_ids, threshold=threshold, night_only=night_only
+    )
+    # _rate_per_storm returns plain list aligned with groupby(storm_id) order;
+    # rebuild the per-storm series so we can join on storm_id below.
+    df_pred = pred[pred["storm_id"].isin(storm_ids)].copy()
+    if night_only and "local_time_mean" in df_pred.columns:
+        df_pred = df_pred[
+            (df_pred["local_time_mean"] >= 19) | (df_pred["local_time_mean"] <= 6)
+        ]
+    rate_per_storm = (
+        (df_pred["epb_probability"] >= threshold)
+        .groupby(df_pred["storm_id"])
+        .mean()
+        .rename("rate")
+    )
+    joined = intense.merge(
+        rate_per_storm, left_on="storm_id", right_index=True, how="inner"
+    )
+
+    rng = np.random.default_rng(42)
+
+    def _boot(values: np.ndarray) -> dict:
+        if values.size == 0:
+            return {"mean": float("nan"), "ci_lo": float("nan"), "ci_hi": float("nan"), "n": 0}
+        boots = np.array(
+            [values[rng.integers(0, values.size, size=values.size)].mean() for _ in range(n_boot)]
+        )
+        return {
+            "mean": float(values.mean()),
+            "ci_lo": float(np.quantile(boots, 0.025)),
+            "ci_hi": float(np.quantile(boots, 0.975)),
+            "n": int(values.size),
+        }
+
+    by_sector: dict[str, dict] = {}
+    for sec in ("asia", "atlantic", "pacific"):
+        vals = joined.loc[joined["lon_sector"] == sec, "rate"].astype("float64").values
+        by_sector[sec] = _boot(vals)
+
+    # Kruskal-Wallis test across the 3 sectors (where ≥3 storms each).
+    populated = [
+        joined.loc[joined["lon_sector"] == sec, "rate"].astype("float64").tolist()
+        for sec in ("asia", "atlantic", "pacific")
+    ]
+    populated = [v for v in populated if len(v) >= 3]
+    if len(populated) >= 2:
+        from scipy.stats import kruskal
+
+        h, p = kruskal(*populated)
+        kw_test = {"kruskal_H": float(h), "p": float(p), "n_bins": len(populated)}
+    else:
+        kw_test = {"kruskal_H": float("nan"), "p": float("nan"), "n_bins": len(populated)}
+
+    return {
+        "epb_threshold": threshold,
+        "night_only": night_only,
+        "by_sector": by_sector,
+        "kruskal_wallis_3sector": kw_test,
+        "n_storms_total": len(joined),
+        "_rates_count": len(rates_list),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Top-level entry point
 # ---------------------------------------------------------------------------
 
@@ -544,6 +650,9 @@ def run_all(
         "Q5_pre_storm_baseline": q5_pre_storm_baseline(pred, cat, threshold=threshold),
         "Q6_solar_cycle": q6_solar_cycle(pred, cat, threshold=threshold),
         "Q7_inter_station_lag": q7_inter_station_lag(pred, cat, threshold=threshold),
+        "Q8_storm_onset_longitude": q8_storm_onset_longitude(
+            pred, cat, threshold=threshold, n_boot=n_boot
+        ),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=2, default=str))

@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchOrNull } from "@/lib/api";
+import { DstTrace, type TimelinePoint } from "@/components/DstTrace";
 
 export const revalidate = 0;
 
@@ -30,6 +32,8 @@ type EventRow = {
   ipp_lat_mean: number;
 };
 
+type Timeline = { rows: TimelinePoint[] };
+
 export default async function StormDetailPage({
   params,
 }: {
@@ -52,24 +56,38 @@ export default async function StormDetailPage({
           Storm #{stormId} not found.
         </h1>
         <p className="mt-4 text-[var(--fg-muted)]">
-          The catalog parquet doesn't list a storm with that id, or the
-          v3 catalog hasn't been built yet.
+          The catalog parquet doesn&apos;t list a storm with that id, or the
+          v3 catalog hasn&apos;t been built yet.
         </p>
       </section>
     );
   }
 
-  const events = await fetchOrNull<EventRow[]>(
-    `/events?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}&limit=10000`,
-  );
+  const [events, timeline] = await Promise.all([
+    fetchOrNull<EventRow[]>(
+      `/events?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}&limit=10000`,
+    ),
+    fetchOrNull<Timeline>(
+      `/storms/timeline?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}&step_hours=1`,
+    ),
+  ]);
 
   const evs = events ?? [];
+  const tlRows = timeline?.rows ?? [];
+
+  // Per-station counts.
   const byStation: Record<string, number> = {};
   for (const e of evs) byStation[e.sta] = (byStation[e.sta] ?? 0) + 1;
   const sortedStations = Object.entries(byStation).sort((a, b) => b[1] - a[1]);
 
+  // Per-event hourly counts for the Dst trace overlay.
+  const eventsByHour = evs.map((e) => ({
+    time: e.start,
+    n: 1,
+  }));
+
   return (
-    <section className="max-w-6xl mx-auto px-6 py-12 space-y-10">
+    <section className="max-w-6xl mx-auto px-6 py-12 space-y-8">
       <div>
         <p className="font-mono text-xs text-[var(--accent)] tracking-[0.2em] uppercase">
           Storms · detail
@@ -89,6 +107,12 @@ export default async function StormDetailPage({
           . Local time at Brazilian sector when the minimum hit:{" "}
           <span className="text-white/85 font-mono">{storm.lt_bin}</span>.
         </p>
+        <Link
+          href="/storms"
+          className="inline-block mt-3 text-xs text-[var(--accent)] underline"
+        >
+          ← back to /storms
+        </Link>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4">
@@ -112,6 +136,10 @@ export default async function StormDetailPage({
         />
       </div>
 
+      {/* Dst trace + events */}
+      {tlRows.length > 0 && <DstTrace rows={tlRows} events={eventsByHour} />}
+
+      {/* Per-station EPB counts */}
       <div className="card p-6">
         <h2 className="font-display text-xl font-semibold">
           Detected EPBs · by station
@@ -119,7 +147,7 @@ export default async function StormDetailPage({
         {sortedStations.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--fg-muted)]">
             No events on disk for this storm window — either Phase 2-A
-            never ingested it, or the model didn't fire any positives.
+            never ingested it, or the model didn&apos;t fire any positives.
           </p>
         ) : (
           <ul className="mt-4 space-y-1 text-sm">
@@ -138,6 +166,7 @@ export default async function StormDetailPage({
         )}
       </div>
 
+      {/* Storm window */}
       <div className="card p-6">
         <h2 className="font-display text-xl font-semibold">Storm window</h2>
         <ul className="mt-3 text-sm space-y-1 font-mono">
@@ -158,6 +187,12 @@ export default async function StormDetailPage({
             {storm.season}
           </li>
         </ul>
+        <Link
+          href={`/map?t0=${encodeURIComponent(storm.main_start)}&t1=${encodeURIComponent(storm.recovery_end)}`}
+          className="mt-4 inline-block text-sm text-[var(--accent)] underline"
+        >
+          View this storm window on the map →
+        </Link>
       </div>
     </section>
   );

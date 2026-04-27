@@ -64,6 +64,13 @@ type Q7 = {
   bin_minutes?: number;
 };
 
+type Q8Bin = { mean: number; ci_lo: number; ci_hi: number; n: number };
+type Q8 = {
+  by_sector: Record<string, Q8Bin>;
+  kruskal_wallis_3sector?: { p: number; n_bins: number };
+  n_storms_total: number;
+};
+
 type Analysis = {
   available?: boolean;
   generated_at?: string;
@@ -75,6 +82,7 @@ type Analysis = {
   Q5_pre_storm_baseline?: Q5;
   Q6_solar_cycle?: { by_quartile: Q6Quartile[]; n_storms: number };
   Q7_inter_station_lag?: Q7;
+  Q8_storm_onset_longitude?: Q8;
 };
 
 function fmtPct(x: number) {
@@ -123,6 +131,7 @@ export default async function FindingsPage() {
   const q5 = a.Q5_pre_storm_baseline;
   const q6 = a.Q6_solar_cycle;
   const q7 = a.Q7_inter_station_lag;
+  const q8 = a.Q8_storm_onset_longitude;
 
   const q1Ratio = q1.ratio_storm_to_quiet;
   const q1Null = q1Ratio.ci_lo <= 1 && q1Ratio.ci_hi >= 1;
@@ -480,6 +489,83 @@ export default async function FindingsPage() {
             alt="Inter-station lag"
             caption="fig19 — cross-correlation curve, lag in minutes."
           />
+        </Section>
+      )}
+
+      {/* Q8 — storm-onset LT × longitude */}
+      {q8 && q8.by_sector && (
+        <Section
+          tag="Q8 — storm-onset longitude (UT-of-Dst-min)"
+          title="Per-storm Brazilian-sector EPB rate by which longitude was at sunset when Dst-min hit."
+          tone={
+            q8.kruskal_wallis_3sector && q8.kruskal_wallis_3sector.p < 0.05
+              ? "positive"
+              : "null"
+          }
+        >
+          <p className="mt-2 text-[var(--fg-muted)] max-w-prose">
+            Same physics as Q2 (PRE coupling) viewed at the global LT
+            scale: bin every intense+ storm by the UT-hour of its
+            Dst-minimum. UT 06–14 ≈ sunset over Asia/India; UT 14–22 ≈
+            sunset over the Atlantic / Brazilian terminator (overlaps
+            with Q2&apos;s &quot;PRE&quot; bin); UT 22–06 ≈ sunset over
+            Pacific. We measure the per-storm rate over the Brazilian
+            sector in each UT-of-onset bin, with bootstrap CIs.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {(["asia", "atlantic", "pacific"] as const).map((sec) => {
+              const b = q8.by_sector[sec];
+              if (!b) return null;
+              const max = Math.max(
+                ...Object.values(q8.by_sector).map((x) => x.mean ?? 0),
+                0.001,
+              );
+              const pct = b.mean != null ? (b.mean / max) * 100 : 0;
+              const highlight = sec === "atlantic";
+              return (
+                <div
+                  key={sec}
+                  className={`card p-3 ${highlight ? "ring-1 ring-[var(--accent)]/40" : ""}`}
+                >
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--fg-muted)]">
+                    {sec}{" "}
+                    <span className="text-white/60 font-mono">
+                      (UT{" "}
+                      {sec === "asia"
+                        ? "06–14"
+                        : sec === "atlantic"
+                          ? "14–22"
+                          : "22–06"}
+                      )
+                    </span>
+                  </div>
+                  <div className="mt-2 h-20 flex items-end">
+                    <div
+                      className={`w-full rounded-t ${highlight ? "bg-[var(--accent)]/80" : "bg-white/30"}`}
+                      style={{ height: `${Math.max(4, pct)}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 font-mono text-xs text-white/85">
+                    {b.mean != null ? b.mean.toFixed(4) : "—"}
+                  </div>
+                  <div className="text-[10px] text-[var(--fg-muted)] font-mono">
+                    n={b.n} ·{" "}
+                    {b.ci_lo != null && b.ci_hi != null
+                      ? `[${b.ci_lo.toFixed(3)}, ${b.ci_hi.toFixed(3)}]`
+                      : "—"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {q8.kruskal_wallis_3sector && (
+            <div className="mt-3 text-xs text-[var(--fg-muted)] font-mono">
+              Kruskal-Wallis (3 sectors) p ={" "}
+              {pStr(q8.kruskal_wallis_3sector.p)} · n_bins ={" "}
+              {q8.kruskal_wallis_3sector.n_bins} · n_storms ={" "}
+              {q8.n_storms_total}
+            </div>
+          )}
         </Section>
       )}
 
