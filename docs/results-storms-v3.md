@@ -131,6 +131,33 @@ between **SALU** and **BRAZ**:
 
 ![Station lag](../paper/figures/fig19_station_lag.png)
 
+## Cycle-stratified storm-vs-quiet (post-hoc)
+
+To test the hypothesis "Q1 null is because solar-max saturates the
+quiet baseline," we compute the storm/quiet ratio **separately within
+each F10.7 phase quartile** — both the storm-time and quiet-time rates
+are restricted to windows whose F10.7 is in the same quartile. This
+is the methodologically correct apples-to-apples comparison.
+
+| Phase Q | F10.7 range | n storms | n quiet groups | storm rate | quiet rate | ratio | 95% CI |
+|---|---|---:|---:|---:|---:|---:|---|
+| Q0 (min) | 65.8 – 92.4 | 8 | 330 | 0.018 | 0.015 | 1.24× | [0.30, 1.97] |
+| Q1 | 92.4 – 130.8 | 8 | 308 | 0.030 | 0.045 | 0.66× | [0.30, 1.03] |
+| Q2 | 130.8 – 165.8 | 7 | 318 | 0.048 | 0.064 | 0.75× | [0.35, 1.15] |
+| Q3 (max) | 165.8 – 303.2 | 8 | 288 | 0.078 | 0.086 | 0.90× | [0.34, 1.40] |
+
+**All four CIs include 1.0** — the storm-vs-quiet null holds even
+after stratifying by solar phase. The Q6 monotonic increase from 0.0077
+to 0.0350 is therefore a property of the **quiet baseline**, not of
+storms themselves: EPB activity at the Brazilian sector scales with
+F10.7 / EUV irradiance regardless of geomagnetic disturbance.
+
+This rules out the "quiet baseline saturates at solar max" explanation
+for the Q1 null and instead supports a simpler picture: in this
+sample, geomagnetic storms do not measurably amplify or suppress EPB
+rates relative to phase-matched quiet days. Companion JSON:
+[`docs/storms-v3-cycle-stratified.json`](storms-v3-cycle-stratified.json).
+
 ## Honest caveats
 
 - Pi/Cherniak heuristic still drives the labels — the model output
