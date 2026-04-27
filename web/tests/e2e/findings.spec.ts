@@ -11,7 +11,11 @@ test("/findings renders even when analysis JSON is absent", async ({ page }) => 
   ).toBeVisible();
 });
 
-test("/findings renders the three hero stats when analysis is present", async ({ page }) => {
+// FIXME: page is server-rendered (RSC), so the SSR fetch goes straight to
+// API_INTERNAL_URL — Playwright's page.route only intercepts browser
+// requests and never fires here. Re-enable once the data fetch moves to
+// a client component or we wire up MSW for SSR mocks.
+test.fixme("/findings renders the three hero stats when analysis is present", async ({ page }) => {
   await page.route("**/api/storms/v3/analysis", (route) =>
     route.fulfill({
       json: {
