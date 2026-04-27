@@ -154,3 +154,196 @@ plasma-bubble-paper/
 ├── notebooks/            01_eda, 02_label_audit, 03_baseline, colab_ramp
 └── docs/                 phase plans + Phase 2-A results report
 ```
+
+## Quick start
+
+```bash
+# Python 3.11 recommended; CI tests 3.10/3.11/3.12
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,api,paper]"
+
+# Tiny MVP run: 3 stations × 10 days, ~30 min on a laptop
+epb ingest mvp
+epb run-all run-all          # nested group due to typer quirk
+
+# Local web dev
+cd web && pnpm install && pnpm dev          # http://localhost:3000
+```
+
+## Installation
+
+### Python
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev,api,paper]"
+```
+
+Optional extras:
+
+- `dev` — pytest, ruff, mypy, hypothesis, pre-commit
+- `api` — fastapi, uvicorn, httpx
+- `paper` — matplotlib themes, seaborn
+
+`pre-commit install` after the editable install enables the project's lint/format hooks (`.pre-commit-config.yaml`).
+
+### Web
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+### Docker
+
+The runtime image bundles the pyOASIS perf patches and a pinned numpy/pandas:
+
+```bash
+docker buildx build --platform linux/arm64 -t epb-detector:arm64-opt -f Dockerfile --load .
+docker buildx build --platform linux/amd64 -t epb-detector:amd64-opt -f Dockerfile --load .
+```
+
+Compose spec for production: `docker/compose.yml` (api + web + ingest worker, Traefik labels for `dokploy-network`).
+
+## Usage
+
+The unified entry point is the `epb` CLI (typer):
+
+```bash
+epb --help
+epb ingest mvp                       # 3 stations × 10 days
+epb ingest phase2a --skip BOAV       # Phase 2-A station list
+epb features compute --version v2
+epb labels compute --version v2
+epb dataset snapshot --id v2
+epb train --model-id xgb_v0.3.0 --snapshot v2
+epb predict --model-id xgb_v0.3.0
+epb events build --version v2
+epb paper figure 10                  # regenerate fig10
+epb serve                            # local FastAPI on :8000
+epb run-all run-all                  # full pipeline (nested due to typer quirk)
+```
+
+Defaults match the production run (`v2` features, `v2` snapshot, `xgb_v0.3.0` model). Figure scripts fall back to the latest entry in `models/registry.json` when no `model_id` is passed.
+
+## API
+
+FastAPI routers live in `services/api/app/routers/`.
+
+| Router | Notable endpoints |
+|---|---|
+| `events` | `GET /events`, `/events/summary`, `/events/timeseries?sta=&sat=&t0=&t1=`, `/events/day-roti?sta=&date=` |
+| `storms` | `/storms/{timeline,catalog,by-phase,superposed-epoch}` (latest `labels_v*.parquet`) |
+| `validation` | `/validation/case-studies` (latest `case_study_validation_v*.json`) |
+| `dataset` | `/training-data/snapshots`, sample, distribution, download |
+| `stations` | RBMC station catalogue with QD-lat |
+| `ingest` | `/ingest/status` for live progress while a worker runs |
+| `climatology` | LT × month × ROTI bins |
+
+OpenAPI docs (Swagger UI) are served at `/api/docs` on the live deployment.
+
+## Web app
+
+Next.js 14 (app router) at `web/app/`:
+
+| Route | Purpose |
+|---|---|
+| `/` | Landing — overview, latest run summary, key figures |
+| `/map` | MapLibre + UTC slider, event markers, drawer with ROTI / ΔTEC / SIDX time-series |
+| `/storms` | Storm catalogue, by-phase rates, superposed-epoch view |
+| `/validation` | Recall against published case studies |
+| `/dataset` | Snapshot browser, distribution, parquet download |
+| `/methods` | Pipeline diagram, feature definitions, label heuristics |
+
+The map slider snaps to UTC midnight (24h step); events are visible when their `[start, end]` overlaps `[cursor, cursor + 24h]`.
+
+## Testing
+
+```bash
+pytest -q                                  # unit + property + integration + API
+pnpm -C web test                           # vitest
+pnpm -C web exec playwright test           # e2e (chromium): map, storms, dataset, methods, a11y
+```
+
+Coverage targets: 85% on `epb_detector/{io,features,labels}`, 70% elsewhere. The integration test runs the full ingest → features → train → predict pipeline on a tiny RNX3 fixture in <30 s and asserts a PR-AUC threshold.
+
+CI matrix: GitHub Actions `py3.10 / 3.11 / 3.12` + Node 20 web build + Playwright.
+
+## Deployment
+
+Live patches without rebuilding the image:
+
+**Python (API):**
+
+```bash
+scp services/api/app/routers/<file>.py root@<vps>:/tmp/
+ssh root@<vps> 'docker cp /tmp/<file>.py epb-api:/app/services/api/app/routers/<file>.py
+                docker restart epb-api'
+```
+
+**Frontend (web):** Next.js builds bundles ahead of time, so a full rebuild on the VPS is required:
+
+```bash
+ssh root@<vps> 'cd /opt/epb-detector && git pull && \
+                cd docker && docker compose build web && \
+                docker compose up -d --no-deps web'
+```
+
+**Burst ingest:** the recommended pattern for catching up the queue is a Hetzner CCX33 — build the AMD image locally, `docker save | gzip | scp`, rsync state from Oracle, run with `EPB_INGEST_WORKERS=8`, then rsync OUTPUT back and destroy the VM.
+
+## Reproducing paper figures
+
+Each figure has a script `paper/scripts/make_figXX_*.py` that:
+
+1. Reads a SHA-pinned dataset snapshot.
+2. Applies the matplotlib theme (AGU / IEEE / `slides_dark`) from `_style.py`.
+3. Writes `paper/figures/figXX_name.{pdf,png,svg}`.
+4. Updates `paper/figures/manifest.json` with `{snapshot_sha, model_id, seed, generated_at}`.
+
+```bash
+python paper/scripts/make_all.py        # regenerate everything
+pytest paper/scripts/tests/             # asserts shapes, presence, no NaNs
+```
+
+Slides + poster source live in `paper/conference/` (Marp + Inkscape).
+
+## Status
+
+**Phase 2-A** is live — 8 RBMC stations × ~77 days (Sep 2023 – May 2024 = 539 station-days). 400 ingested OK, 181 failed (PALM/MAPA absent in the IBGE archive). Model `xgb_v0.3.0`, snapshot `v2`, 6,250 events served.
+
+Headlines from [`docs/results-phase2a.md`](docs/results-phase2a.md):
+
+- Test-fold PR-AUC = **0.9991** — but features and labels share inputs, so this is closer to "fidelity to the heuristic" than "true bubble recall".
+- Independent recall against published case studies: **6/6 stations, 3/3 evaluable events**. This is the more meaningful number.
+- Storm-phase rates came out `main (6.0%) > none (5.1%) > recovery (3.9%)`, the *opposite* of the Aarons (1991) canon. Either the phase-boundary definition has an issue, or it is a real result. Bootstrap CI per longitude/season is on the next-steps list.
+
+The next thing that meaningfully moves the needle is **active learning** (a drawer where humans confirm/refute prob 0.4–0.7 events).
+
+## Citation
+
+If you use this work, please cite both pyOASIS and this repository.
+
+```bibtex
+@article{picanco2025oasis,
+  title   = {OASIS: Open-Access System for Ionospheric Studies},
+  author  = {Picanço, G. and others},
+  journal = {GPS Solutions},
+  year    = {2025},
+  note    = {submitted}
+}
+```
+
+A [`CITATION.cff`](CITATION.cff) is provided for GitHub's citation widget.
+
+## License
+
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (non-commercial), matching upstream OASIS. See [`LICENSE`](LICENSE).
+
+## Acknowledgements
+
+- **pyOASIS** — Picanço et al. ([github.com/giorgiopicanco/OASIS](https://github.com/giorgiopicanco/OASIS)).
+- **RBMC** — Brazilian Continuous GNSS Network (IBGE).
+- **MGEX** — Multi-GNSS Experiment SP3 orbits via GFZ and JAXA.
+- **Space weather indices** — Kp/ap/F10.7 (GFZ Potsdam), Dst (WDC Kyoto).
