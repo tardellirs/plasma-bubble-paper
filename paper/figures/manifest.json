@@ -43,6 +43,135 @@
         "png": "f434ad6f865a8e32bf22977990fde72e1fcf5786ead28704698ca152a9486d8e"
       },
       "snapshot_id": "v1"
+    },
+    "fig12_storm_vs_quiet_v3": {
+      "files": {
+        "pdf": "paper/figures/fig12_storm_vs_quiet_v3.pdf",
+        "png": "paper/figures/fig12_storm_vs_quiet_v3.png",
+        "svg": "paper/figures/fig12_storm_vs_quiet_v3.svg"
+      },
+      "generated_at": "2026-04-27T12:32:27.995718+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig12_storm_vs_quiet_v3.py",
+      "sha256": {
+        "pdf": "f16eefd635835ff8bdd2a75d940968e81e82d9cc9a7f08c681572310d9f99d54",
+        "png": "30b77fc610871b310de01d89c6af29c0b3837b4d6c6829dc939fbbed651e5b75",
+        "svg": "98c5bf67b187315d00a96b36e8101086cf9d3b01eea98130140b40d8cb4e80fc"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig13_storm_lt_polar": {
+      "files": {
+        "pdf": "paper/figures/fig13_storm_lt_polar.pdf",
+        "png": "paper/figures/fig13_storm_lt_polar.png",
+        "svg": "paper/figures/fig13_storm_lt_polar.svg"
+      },
+      "generated_at": "2026-04-27T12:32:29.770595+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig13_storm_lt_polar.py",
+      "sha256": {
+        "pdf": "26aa92a2a7bbf6dc731aa5a38427ee6fe435b489df2c700b2f87288fa8703efb",
+        "png": "d2b450d37f00f174f03b33d87f12097da19aacfa1396e384a1413d37a7f5dd6d",
+        "svg": "07827979cce74c7c88a874d1434cafb6fd1d079b4d464d99bbbe17aad1b24eb4"
+      },
+      "snapshot_id": "v3",
+      "two_bin_p_value": 0.7713256306837188
+    },
+    "fig14_intensity_curve": {
+      "files": {
+        "pdf": "paper/figures/fig14_intensity_curve.pdf",
+        "png": "paper/figures/fig14_intensity_curve.png",
+        "svg": "paper/figures/fig14_intensity_curve.svg"
+      },
+      "generated_at": "2026-04-27T12:32:32.850017+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig14_intensity_curve.py",
+      "sha256": {
+        "pdf": "711f4936ee6e6c097cbe261428b45ee87d142dc608d7d2cc42c90d48397ac8e1",
+        "png": "b17067671207181eaa312ba8175e2800c3bc89c6a261129a7340a847df3867a3",
+        "svg": "e747e0373df48aae9fe28c95bbe6ab78cd96ee03e72adc50f9b0dc84b1194fb9"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig15_solar_cycle_strip": {
+      "files": {
+        "pdf": "paper/figures/fig15_solar_cycle_strip.pdf",
+        "png": "paper/figures/fig15_solar_cycle_strip.png",
+        "svg": "paper/figures/fig15_solar_cycle_strip.svg"
+      },
+      "generated_at": "2026-04-27T12:32:35.400016+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig15_solar_cycle_strip.py",
+      "sha256": {
+        "pdf": "fed49cd1b56f1ed9766d25c8bae40326694b5fcd08f5ac1d479f85ce12afae21",
+        "png": "e2387da6e031673c1a4940c6bb9907ff57fab0d6c0cb8efaf403df5aedf88a1e",
+        "svg": "c1a8bf3f716a9c5a46f325300a3a4fbfb6ce493a47412a8fadff8be5cf9f0a80"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig16_recovery_duration": {
+      "files": {
+        "pdf": "paper/figures/fig16_recovery_duration.pdf",
+        "png": "paper/figures/fig16_recovery_duration.png",
+        "svg": "paper/figures/fig16_recovery_duration.svg"
+      },
+      "generated_at": "2026-04-27T12:32:37.000216+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig16_recovery_duration.py",
+      "sha256": {
+        "pdf": "1f9227b4fef7512a019876aa7273e5d0b20025a9006ee12cdb20b7e8b381d8cb",
+        "png": "6ddc96825ba7b2912b2ce6a06e4270307127e285a0bbd5e5da34487ced32b797",
+        "svg": "a300deef2ff23298c92a1eb780e2842a204ece3308d969bf6caac5971416f3d2"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig17_precursor": {
+      "files": {
+        "pdf": "paper/figures/fig17_precursor.pdf",
+        "png": "paper/figures/fig17_precursor.png",
+        "svg": "paper/figures/fig17_precursor.svg"
+      },
+      "generated_at": "2026-04-27T12:32:38.478586+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig17_precursor.py",
+      "sha256": {
+        "pdf": "5b3e84d0c0fe1674e0e0b0bd0aa6b45646797dc390cd6fc0d46e2132658a4dfa",
+        "png": "f224204950946a58ccb50fd916ee16f8b63a2b8132fcb63b704c3d14ed3d7f13",
+        "svg": "d62177e7d1384aaf191ae00f3f7a4fc2b7338de8e843e5d33270f1a0eca7e4b6"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig18_cycle_modulation": {
+      "files": {
+        "pdf": "paper/figures/fig18_cycle_modulation.pdf",
+        "png": "paper/figures/fig18_cycle_modulation.png",
+        "svg": "paper/figures/fig18_cycle_modulation.svg"
+      },
+      "generated_at": "2026-04-27T12:32:40.030197+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig18_cycle_modulation.py",
+      "sha256": {
+        "pdf": "3bf1cfb0888fb494192989bc8e1735aeb24045439f2c595251c8b52ac6560c07",
+        "png": "de9f0f29dfbd1614e8b4b394d0308d76282bf1e5fb53055c1400303a4d104641",
+        "svg": "96bf5aea4e787d062abeab9947f9899f8d884db9258c7f7f97cb303f96a7621b"
+      },
+      "snapshot_id": "v3"
+    },
+    "fig19_station_lag": {
+      "files": {
+        "pdf": "paper/figures/fig19_station_lag.pdf",
+        "png": "paper/figures/fig19_station_lag.png",
+        "svg": "paper/figures/fig19_station_lag.svg"
+      },
+      "generated_at": "2026-04-27T12:32:41.672174+00:00",
+      "model_id": "xgb_v0.3.0",
+      "script": "paper/scripts/make_fig19_station_lag.py",
+      "sha256": {
+        "pdf": "bae79bf34b555579f3aac186e8f2d285448b1ab766df1b0ea0e26466be258e78",
+        "png": "c0890f29609bb3a2384aa1b198090539bd07919b102cb45dbbe80b07cfa66955",
+        "svg": "fdc4d403f0b09f416226b663dedc0287894a26084ba96bfd4f7a233160ef54d7"
+      },
+      "snapshot_id": "v3"
     }
   }
 }

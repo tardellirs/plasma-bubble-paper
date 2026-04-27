@@ -1,0 +1,230 @@
+{
+  "model_id_predicted_with": "xgb_v0.3.0",
+  "predictions_path": "/data/processed/predictions_v3.parquet",
+  "catalog_path": "/data/processed/storm_catalog_v3.parquet",
+  "generated_at": "2026-04-27T12:32:09.135794+00:00",
+  "Q1_storm_vs_quiet": {
+    "storm_threshold_nt": -100,
+    "epb_threshold": 0.5,
+    "night_only": true,
+    "storm_rate_mean": 0.03963748303237988,
+    "quiet_rate_mean": 0.04928568761546213,
+    "ratio_storm_to_quiet": {
+      "ratio": 0.8042392213666636,
+      "ci_lo": 0.4684203420375873,
+      "ci_hi": 1.1947872639541592,
+      "n_storms": 31,
+      "n_quiet_groups": 1244
+    },
+    "n_intense_storms": 31
+  },
+  "Q2_lt_amplification": {
+    "epb_threshold": 0.5,
+    "night_only": true,
+    "four_bin": {
+      "pre_sunset": {
+        "mean": 0.018783933253360963,
+        "ci_lo": 0.0041254466874487295,
+        "ci_hi": 0.0369887699855168,
+        "n": 7
+      },
+      "PRE": {
+        "mean": 0.0320627964049701,
+        "ci_lo": 0.014496182657514388,
+        "ci_hi": 0.05217584523255083,
+        "n": 6
+      },
+      "post_midnight": {
+        "mean": 0.04836114417723138,
+        "ci_lo": 0.021265201887750083,
+        "ci_hi": 0.07658371184891959,
+        "n": 10
+      },
+      "morning": {
+        "mean": 0.0526607776285144,
+        "ci_lo": 0.014474094164658616,
+        "ci_hi": 0.09962923629235311,
+        "n": 8
+      }
+    },
+    "two_bin": {
+      "PRE_adjacent": {
+        "mean": 0.024912639323334408,
+        "ci_lo": 0.012524786853769489,
+        "ci_hi": 0.03838351039062857,
+        "n": 13
+      },
+      "non_PRE": {
+        "mean": 0.05027209237780161,
+        "ci_lo": 0.02531115785465252,
+        "ci_hi": 0.07627118310552494,
+        "n": 18
+      }
+    },
+    "two_bin_mannwhitney_test": {
+      "mannwhitney_U": 99.0,
+      "p_one_sided_greater": 0.7713256306837188
+    },
+    "kruskal_wallis_4bin": {
+      "kruskal_H": 1.5284844089920275,
+      "p": 0.6757119189221023,
+      "n_bins": 4
+    }
+  },
+  "Q3_intensity_curve": {
+    "epb_threshold": 0.5,
+    "n_storms": 47,
+    "spearman_rho": 0.20046101949656797,
+    "spearman_p": 0.17668099967574766,
+    "bins": [
+      {
+        "abs_dst_lo": 49.999,
+        "abs_dst_hi": 70.6,
+        "n": 10,
+        "rate_mean": 0.0190251725699626,
+        "rate_std": 0.03143563923220274
+      },
+      {
+        "abs_dst_lo": 70.6,
+        "abs_dst_hi": 101.8,
+        "n": 9,
+        "rate_mean": 0.00897639908295985,
+        "rate_std": 0.013807514206523737
+      },
+      {
+        "abs_dst_lo": 101.8,
+        "abs_dst_hi": 116.6,
+        "n": 9,
+        "rate_mean": 0.022347163717392995,
+        "rate_std": 0.027673643274589106
+      },
+      {
+        "abs_dst_lo": 116.6,
+        "abs_dst_hi": 160.0,
+        "n": 9,
+        "rate_mean": 0.015772553007934665,
+        "rate_std": 0.021204593652115675
+      },
+      {
+        "abs_dst_lo": 160.0,
+        "abs_dst_hi": 406.0,
+        "n": 10,
+        "rate_mean": 0.016591931002698058,
+        "rate_std": 0.01839807077295036
+      }
+    ]
+  },
+  "Q4_recovery_duration": {
+    "n_short": 2,
+    "n_long": 9,
+    "short_rate_mean": 0.0,
+    "long_rate_mean": 0.02009832023924888,
+    "mannwhitney_U": 1.0,
+    "p_two_sided": 0.07441390303321069
+  },
+  "Q5_pre_storm_baseline": {
+    "pre_hours": 12.0,
+    "n_pre_windows": 0,
+    "pre_rate": NaN,
+    "quiet_rate": 0.019196867941575064,
+    "elevation_ratio": NaN
+  },
+  "Q6_solar_cycle": {
+    "epb_threshold": 0.5,
+    "by_quartile": [
+      {
+        "quartile": 0,
+        "n": 8,
+        "phase_lo": 0.29694700059862733,
+        "phase_hi": 0.4193175648396932,
+        "rate_mean": 0.008064332046099578
+      },
+      {
+        "quartile": 1,
+        "n": 8,
+        "phase_lo": 0.4602469685790258,
+        "phase_hi": 0.6147763500438529,
+        "rate_mean": 0.020976478063051814
+      },
+      {
+        "quartile": 2,
+        "n": 7,
+        "phase_lo": 0.6465175202906823,
+        "phase_hi": 0.8148292519942643,
+        "rate_mean": 0.024652803033757244
+      },
+      {
+        "quartile": 3,
+        "n": 8,
+        "phase_lo": 0.8403057175871141,
+        "phase_hi": 1.1376703651626734,
+        "rate_mean": 0.01911578203460778
+      }
+    ],
+    "n_storms": 31
+  },
+  "Q7_inter_station_lag": {
+    "pair": [
+      "SALU",
+      "BRAZ"
+    ],
+    "bin_minutes": 10,
+    "epb_threshold": 0.5,
+    "peak_lag_min": 0,
+    "peak_corr": 0.6282428937400394,
+    "lags": [
+      {
+        "lag_min": -60,
+        "corr": 0.5836881249005971
+      },
+      {
+        "lag_min": -50,
+        "corr": 0.5995372428603513
+      },
+      {
+        "lag_min": -40,
+        "corr": 0.6096648769527123
+      },
+      {
+        "lag_min": -30,
+        "corr": 0.6174446160275896
+      },
+      {
+        "lag_min": -20,
+        "corr": 0.622286149731231
+      },
+      {
+        "lag_min": -10,
+        "corr": 0.6181572923427721
+      },
+      {
+        "lag_min": 0,
+        "corr": 0.6282428937400394
+      },
+      {
+        "lag_min": 10,
+        "corr": 0.5854918062286613
+      },
+      {
+        "lag_min": 20,
+        "corr": 0.5622298302192438
+      },
+      {
+        "lag_min": 30,
+        "corr": 0.5362642692870091
+      },
+      {
+        "lag_min": 40,
+        "corr": 0.5130282168131627
+      },
+      {
+        "lag_min": 50,
+        "corr": 0.4889555482044283
+      },
+      {
+        "lag_min": 60,
+        "corr": 0.46672288690590386
+      }
+    ]
+  }
+}
