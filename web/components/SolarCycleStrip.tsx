@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 export type SsnPoint = { date: string; ssn: number };
 export type StormDot = {
@@ -36,6 +36,7 @@ export function SolarCycleStrip({
   storms: StormDot[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   // Down-sample SSN to ~monthly cadence for performance.
   const ssnByMonth: Record<string, number[]> = {};
   for (const p of ssn) {
@@ -177,7 +178,12 @@ export function SolarCycleStrip({
                     fillOpacity={0.7}
                     stroke="none"
                     style={{ cursor: "pointer" }}
-                    onClick={() => router.push(`/storms/${payload.storm_id}`)}
+                    onClick={() =>
+                      router.push(
+                        `${pathname}?selected=${payload.storm_id}`,
+                        { scroll: false },
+                      )
+                    }
                   />
                 );
               }}
@@ -186,7 +192,7 @@ export function SolarCycleStrip({
         </ResponsiveContainer>
       </div>
       <div className="mt-2 text-[11px] text-[var(--fg-muted)] font-mono">
-        click any storm dot → /storms/[id] deep dive
+        click any storm dot → opens detail drawer (or use the catalog below)
       </div>
     </div>
   );

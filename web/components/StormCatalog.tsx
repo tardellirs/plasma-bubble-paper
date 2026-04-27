@@ -71,12 +71,21 @@ export function StormCatalog({ rows }: { rows: StormRow[] }) {
                   {(r.positive_rate * 100).toFixed(2)}%
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/map?t0=${t0}&t1=${t1}`}
-                    className="text-[var(--accent)] hover:underline"
-                  >
-                    open in map →
-                  </Link>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href={`/storms?selected=${r.storm_id}`}
+                      scroll={false}
+                      className="text-[var(--accent)] hover:underline"
+                    >
+                      details
+                    </Link>
+                    <Link
+                      href={`/map?t0=${t0}&t1=${t1}`}
+                      className="text-[var(--fg-muted)] hover:underline"
+                    >
+                      map →
+                    </Link>
+                  </div>
                 </td>
               </tr>
             );

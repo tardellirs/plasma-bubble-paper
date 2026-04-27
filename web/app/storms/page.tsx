@@ -6,6 +6,8 @@ import {
   type SsnPoint,
   type StormDot,
 } from "@/components/SolarCycleStrip";
+import { StormDrawer } from "@/components/StormDrawer";
+import { Suspense } from "react";
 
 export const revalidate = 0;
 
@@ -218,6 +220,11 @@ export default async function StormsPage() {
           for the independent literature recall.
         </p>
       </div>
+
+      {/* Right-side drawer driven by ?selected=<storm_id> */}
+      <Suspense fallback={null}>
+        <StormDrawer />
+      </Suspense>
     </section>
   );
 }
