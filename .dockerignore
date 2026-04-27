@@ -15,8 +15,9 @@ models/*
 !models/registry.json
 !models/.gitkeep
 paper/figures/*.pdf
-paper/figures/*.png
 paper/figures/*.svg
+# Keep PNGs — the API serves them at /api/storms/v3/figure/{name} for
+# the /findings page. PDF/SVG variants stay excluded (paper-only).
 paper/snapshots
 __pycache__
 *.pyc
