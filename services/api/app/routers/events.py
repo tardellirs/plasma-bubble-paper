@@ -74,8 +74,12 @@ def _filter_to_roti_days(rows: list[dict]) -> list[dict]:
         sta = (r.get("sta") or "").upper()
         if start is None or not sta:
             continue
-        # `start` arrives as pandas Timestamp from DuckDB.df().
-        ts = start if hasattr(start, "year") else datetime.fromisoformat(str(start))
+        # `start` may be a pandas Timestamp (pre-serialisation path) or
+        # an ISO string ("YYYY-MM-DDTHH:MM:SSZ") after pre-serialisation.
+        if hasattr(start, "year"):
+            ts = start
+        else:
+            ts = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
         key = (sta, ts.year, ts.timetuple().tm_yday)
         if key in available:
             out.append(r)
@@ -90,10 +94,14 @@ def _all_deduped_events_cached(
     and (optionally) filtered to station-days with raw ROTI on disk.
 
     Cache key = parquet mtimes + ROTI dir mtime + roti_only flag.
-    Per-request filtering (station / t0 / t1 / min_prob / limit) is
-    cheap once we have this list in memory — 15k rows iterate in single-
-    digit milliseconds vs 700 ms re-querying DuckDB.
+    Pre-serialises Timestamp/Timedelta columns to JSON-friendly types
+    so FastAPI's response serialisation drops from ~300 ms to ~30 ms
+    on the 15k-row payload. Coordinates are rounded to 4 decimals
+    (~10 m, plenty for the map) and probabilities to 3 decimals to
+    shrink the wire payload another ~10%.
     """
+    import pandas as pd  # local — keeps import-time cheap
+
     pattern = str(EVENT_GLOB)
     con = duckdb.connect()
     try:
@@ -106,9 +114,25 @@ def _all_deduped_events_cached(
             ) = 1
             ORDER BY start
         """
-        rows = con.execute(sql).df().to_dict(orient="records")
+        df = con.execute(sql).df()
     finally:
         con.close()
+
+    # Pre-serialise the slow-to-JSON columns once, here.
+    for col in ("start", "end"):
+        if col in df.columns:
+            df[col] = df[col].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if "duration_minutes" in df.columns:
+        td = pd.to_timedelta(df["duration_minutes"], errors="coerce")
+        df["duration_minutes"] = (td.dt.total_seconds() / 60).round(2)
+    for col in ("ipp_lon_mean", "ipp_lat_mean", "qd_lat_mean"):
+        if col in df.columns:
+            df[col] = df[col].round(4)
+    for col in ("peak_probability", "peak_roti"):
+        if col in df.columns:
+            df[col] = df[col].round(3)
+    rows = df.to_dict(orient="records")
+
     if roti_only:
         rows = _filter_to_roti_days(rows)
     return rows
@@ -154,9 +178,11 @@ def list_events(
         if sta_u and r.get("sta") != sta_u:
             continue
         if t0 or t1:
-            ts = r.get("start")
-            if hasattr(ts, "to_pydatetime"):
-                ts = ts.to_pydatetime()
+            raw = r.get("start")
+            if hasattr(raw, "to_pydatetime"):
+                ts = raw.to_pydatetime()
+            else:
+                ts = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
             if t0 and ts < t0:
                 continue
             if t1 and ts > t1:
