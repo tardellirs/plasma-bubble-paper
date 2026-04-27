@@ -2,54 +2,52 @@ import { fetchOrNull } from "@/lib/api";
 
 export const revalidate = 0;
 
-type StationStatus = "ingested_ok" | "not_in_queue" | string;
+type HitStatus = "hit" | "miss" | "no_data" | string;
 
-type StationDetail = {
-  sta: string;
-  ingest_state: StationStatus;
-  model_events: number;
-  detected: boolean;
+type StationHit = {
+  status: HitStatus;
+  max_prob: number | null;
+  n_windows: number;
 };
 
 type EventDetail = {
   date: string;
-  in_window: boolean;
-  expected_stations: string[];
   reference: string;
   doi?: string;
   notes?: string;
-  stations: StationDetail[];
-  testable_stations?: number;
-  matched_stations?: number;
-  verdict:
-    | "hit"
-    | "partial"
-    | "miss"
-    | "no_data_to_test"
-    | "out_of_window";
+  stations: string[];
+  hits: Record<string, StationHit>;
 };
 
 type ValidationReport = {
   model_id: string;
   snapshot_id: string;
-  window_start: string;
-  window_end: string;
-  n_case_studies_total: number;
-  n_in_window: number;
-  n_evaluable: number;
-  event_recall: number;
-  station_recall: number;
-  stations_testable: number;
-  stations_detected: number;
-  per_event: EventDetail[];
+  events_total: number;
+  events_evaluable: number;
+  events_recovered: number;
+  station_event_pairs_total: number;
+  station_event_pairs_recovered: number;
+  events: EventDetail[];
 };
+
+type Verdict = "hit" | "partial" | "miss" | "no_data_to_test";
+
+function eventVerdict(ev: EventDetail): Verdict {
+  const statuses = ev.stations.map((s) => ev.hits[s]?.status);
+  const testable = statuses.filter((s) => s === "hit" || s === "miss");
+  if (testable.length === 0) return "no_data_to_test";
+  const hits = statuses.filter((s) => s === "hit").length;
+  if (hits === 0) return "miss";
+  if (hits === testable.length) return "hit";
+  return "partial";
+}
 
 export default async function ValidationPage() {
   const report = await fetchOrNull<ValidationReport>(
     "/validation/case-studies",
   );
 
-  if (!report) {
+  if (!report || !Array.isArray(report.events)) {
     return (
       <section className="max-w-4xl mx-auto px-6 py-16">
         <p className="font-mono text-xs text-[var(--accent)] tracking-[0.2em] uppercase">
@@ -67,13 +65,21 @@ export default async function ValidationPage() {
     );
   }
 
-  const evaluable = report.per_event.filter(
-    (e) => e.in_window && e.verdict !== "no_data_to_test",
+  const eventRecall =
+    report.events_evaluable > 0
+      ? report.events_recovered / report.events_evaluable
+      : 0;
+  const stationRecall =
+    report.station_event_pairs_total > 0
+      ? report.station_event_pairs_recovered /
+        report.station_event_pairs_total
+      : 0;
+
+  const evaluable = report.events.filter(
+    (e) => eventVerdict(e) !== "no_data_to_test",
   );
-  const inWindow = report.per_event.filter((e) => e.in_window);
-  const outOfWindow = report.per_event.filter((e) => !e.in_window);
-  const notTestable = report.per_event.filter(
-    (e) => e.in_window && e.verdict === "no_data_to_test",
+  const notTestable = report.events.filter(
+    (e) => eventVerdict(e) === "no_data_to_test",
   );
 
   return (
@@ -92,10 +98,9 @@ export default async function ValidationPage() {
           <span className="font-mono text-xs">
             src/epb_detector/external/case_studies.yaml
           </span>
-          ). For every case study that falls inside the Phase 2-A run window
-          and has at least one station successfully ingested by pyOASIS, we
-          ask: did the trained model flag at least one event on that date
-          for that station?
+          ). For every case study with at least one station successfully
+          ingested by pyOASIS, we ask: did the trained model flag at least
+          one event on that date for that station?
         </p>
       </div>
 
@@ -103,19 +108,19 @@ export default async function ValidationPage() {
       <div className="grid sm:grid-cols-3 gap-4">
         <BigStat
           label="Event-level recall"
-          value={`${(report.event_recall * 100).toFixed(0)}%`}
-          sub={`${evaluable.filter((e) => e.verdict === "hit" || e.verdict === "partial").length} / ${report.n_evaluable} testable case studies hit`}
+          value={`${(eventRecall * 100).toFixed(0)}%`}
+          sub={`${report.events_recovered} / ${report.events_evaluable} testable case studies hit`}
         />
         <BigStat
           label="Station-level recall"
-          value={`${report.stations_detected} / ${report.stations_testable}`}
-          sub={`${(report.station_recall * 100).toFixed(0)}% of stations with valid data flagged the documented event`}
+          value={`${report.station_event_pairs_recovered} / ${report.station_event_pairs_total}`}
+          sub={`${(stationRecall * 100).toFixed(0)}% of station-event pairs with valid data flagged the documented event`}
           accent
         />
         <BigStat
           label="Model"
           value={report.model_id}
-          sub={`Snapshot ${report.snapshot_id} · ${report.window_start.slice(0, 10)} → ${report.window_end.slice(0, 10)}`}
+          sub={`Snapshot ${report.snapshot_id}`}
         />
       </div>
 
@@ -124,33 +129,28 @@ export default async function ValidationPage() {
         <h2 className="font-display text-xl font-semibold">
           How we computed it
         </h2>
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <FunnelStep
-            n={report.n_case_studies_total}
+            n={report.events_total}
             label="case studies in YAML"
             tone="muted"
           />
           <FunnelStep
-            n={report.n_in_window}
-            label="inside Phase 2-A window"
-            tone="muted"
-          />
-          <FunnelStep
-            n={report.n_evaluable}
+            n={report.events_evaluable}
             label="testable (≥1 ingested station)"
             tone="muted"
           />
           <FunnelStep
-            n={evaluable.filter((e) => e.verdict === "hit" || e.verdict === "partial").length}
+            n={report.events_recovered}
             label="hits"
             tone="accent"
           />
         </div>
         <p className="mt-5 text-sm text-[var(--fg-muted)] max-w-prose">
-          <strong className="text-white/80">Why "data-aware":</strong>{" "}
+          <strong className="text-white/80">Why &quot;data-aware&quot;:</strong>{" "}
           stations that are missing from the IBGE archive (e.g. MAPA, PALM)
-          or excluded from the day-selector queue cannot be evaluated. Counting
-          them as misses would penalize the model for pre-conditions on the
+          or pre-date the ingest window cannot be evaluated. Counting them
+          as misses would penalize the model for pre-conditions on the
           data. We report recall only over the subset where pyOASIS actually
           produced ROTI / ΔTEC / SIDX series.
         </p>
@@ -162,35 +162,36 @@ export default async function ValidationPage() {
           Station legend
         </span>
         <Chip tone="ok">SALU · detected</Chip>
-        <Chip tone="warn">MAPA · ingest failed</Chip>
-        <Chip tone="muted">BOAV · not in queue</Chip>
+        <Chip tone="warn">POAL · no detection</Chip>
+        <Chip tone="muted">BOAV · no data</Chip>
       </div>
 
-      {/* In-window cards */}
+      {/* Evaluable cards */}
       <div className="space-y-4">
         <h2 className="font-display text-xl font-semibold">
-          Evaluable case studies ({inWindow.length})
+          Evaluable case studies ({evaluable.length})
         </h2>
         <div className="grid lg:grid-cols-2 gap-4">
-          {inWindow.map((ev) => (
+          {evaluable.map((ev) => (
             <CaseCard key={ev.date} ev={ev} />
           ))}
         </div>
       </div>
 
-      {/* Out-of-window */}
-      {outOfWindow.length > 0 && (
+      {/* Not testable */}
+      {notTestable.length > 0 && (
         <div className="space-y-3">
           <h2 className="font-display text-xl font-semibold">
-            Outside this run window
+            Not testable in this run
           </h2>
           <p className="text-sm text-[var(--fg-muted)] max-w-prose">
-            These case studies are documented in literature but pre-date the
-            Phase 2-A ingest window (Sep 2023 – May 2024). They will become
-            evaluable when we extend the ingest backwards (Phase 2-B plan).
+            These case studies are documented in literature but no expected
+            station has ingested data for the date — usually because the
+            event pre-dates the ingest window or the listed stations were
+            absent from the IBGE archive.
           </p>
           <div className="grid md:grid-cols-3 gap-3">
-            {outOfWindow.map((ev) => (
+            {notTestable.map((ev) => (
               <div key={ev.date} className="card p-4 text-sm">
                 <div className="font-mono text-xs text-[var(--fg-muted)]">
                   {ev.date}
@@ -226,14 +227,6 @@ export default async function ValidationPage() {
           </code>
           .
         </p>
-        <a
-          className="mt-4 inline-block text-sm text-[var(--accent)] underline"
-          href="https://github.com/tardellirs/plasma-bubble-paper/blob/main/docs/case_study_validation_v2.json"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Raw validation JSON ↗
-        </a>
       </div>
     </section>
   );
@@ -297,31 +290,29 @@ function FunnelStep({
 }
 
 function CaseCard({ ev }: { ev: EventDetail }) {
-  const verdict = ev.verdict;
-  const verdictBadge: Record<EventDetail["verdict"], { txt: string; cls: string }> =
-    {
-      hit: {
-        txt: "All testable stations matched",
-        cls: "bg-emerald-500/15 text-emerald-300",
-      },
-      partial: {
-        txt: "Partial match",
-        cls: "bg-amber-500/15 text-amber-200",
-      },
-      miss: {
-        txt: "No detection",
-        cls: "bg-rose-500/15 text-rose-200",
-      },
-      no_data_to_test: {
-        txt: "Not testable (no station ingested)",
-        cls: "bg-white/5 text-[var(--fg-muted)]",
-      },
-      out_of_window: {
-        txt: "Out of run window",
-        cls: "bg-white/5 text-[var(--fg-muted)]",
-      },
-    };
-  const totalEvents = ev.stations.reduce((acc, s) => acc + s.model_events, 0);
+  const verdict = eventVerdict(ev);
+  const verdictBadge: Record<Verdict, { txt: string; cls: string }> = {
+    hit: {
+      txt: "All testable stations matched",
+      cls: "bg-emerald-500/15 text-emerald-300",
+    },
+    partial: {
+      txt: "Partial match",
+      cls: "bg-amber-500/15 text-amber-200",
+    },
+    miss: {
+      txt: "No detection",
+      cls: "bg-rose-500/15 text-rose-200",
+    },
+    no_data_to_test: {
+      txt: "Not testable (no station ingested)",
+      cls: "bg-white/5 text-[var(--fg-muted)]",
+    },
+  };
+  const totalWindows = ev.stations.reduce(
+    (acc, s) => acc + (ev.hits[s]?.n_windows ?? 0),
+    0,
+  );
   const doiUrl =
     ev.doi && ev.doi.startsWith("10.")
       ? `https://doi.org/${ev.doi}`
@@ -348,24 +339,24 @@ function CaseCard({ ev }: { ev: EventDetail }) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {ev.stations.map((s) => {
-          const tone: "ok" | "warn" | "muted" = s.detected
-            ? "ok"
-            : s.ingest_state === "ingested_ok"
-              ? "warn"
-              : s.ingest_state === "not_in_queue"
-                ? "muted"
-                : "warn";
-          const subLabel = s.detected
-            ? `${s.model_events} events`
-            : s.ingest_state === "not_in_queue"
-              ? "not queued"
-              : s.ingest_state.startsWith("ingest_failed")
-                ? "ingest failed"
-                : "no detection";
+        {ev.stations.map((sta) => {
+          const hit = ev.hits[sta];
+          const status = hit?.status ?? "no_data";
+          const tone: "ok" | "warn" | "muted" =
+            status === "hit"
+              ? "ok"
+              : status === "miss"
+                ? "warn"
+                : "muted";
+          const subLabel =
+            status === "hit"
+              ? `${hit?.n_windows ?? 0} windows`
+              : status === "miss"
+                ? "no detection"
+                : "no data";
           return (
-            <Chip key={s.sta} tone={tone}>
-              <span className="font-mono">{s.sta}</span>{" "}
+            <Chip key={sta} tone={tone}>
+              <span className="font-mono">{sta}</span>{" "}
               <span className="text-[10px] opacity-75 ml-1">{subLabel}</span>
             </Chip>
           );
@@ -374,8 +365,8 @@ function CaseCard({ ev }: { ev: EventDetail }) {
 
       {(verdict === "hit" || verdict === "partial") && (
         <div className="mt-4 text-xs text-[var(--fg-muted)]">
-          <span className="text-white/80 font-mono">{totalEvents}</span>{" "}
-          model-detected events on this date across testable stations
+          <span className="text-white/80 font-mono">{totalWindows}</span>{" "}
+          positive windows on this date across testable stations
         </div>
       )}
 
