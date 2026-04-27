@@ -14,18 +14,27 @@ router = APIRouter(prefix="/events", tags=["events"])
 EVENT_GLOB = SETTINGS.paths.data_processed / "events" / "*.parquet"
 
 
-def _query_events(where_sql: str, params: list) -> list[dict]:
+def _query_events(where_sql: str, params: list, limit: int) -> list[dict]:
     pattern = str(EVENT_GLOB)
     if not list(EVENT_GLOB.parent.glob("*.parquet")):
         return []
     con = duckdb.connect()
     try:
+        # The events folder may carry multiple snapshot versions
+        # (events_v2.parquet for Phase 2-A, events_v3.parquet for the
+        # storm-stratified ingest). They overlap on the days that fell
+        # in both selectors. Dedup by (sta, sat, start) and keep the
+        # highest-probability row so we don't double-count.
         sql = f"""
             SELECT *
             FROM parquet_scan('{pattern}')
             {where_sql}
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY sta, sat, start
+                ORDER BY peak_probability DESC
+            ) = 1
             ORDER BY start
-            LIMIT 5000
+            LIMIT {int(limit)}
         """
         return con.execute(sql, params).df().to_dict(orient="records")
     finally:
@@ -38,6 +47,7 @@ def list_events(
     t0: datetime | None = Query(default=None, description="Earliest event start (UTC)"),
     t1: datetime | None = Query(default=None, description="Latest event start (UTC)"),
     min_prob: float = Query(default=0.5, ge=0.0, le=1.0),
+    limit: int = Query(default=50_000, ge=1, le=200_000),
 ) -> list[dict]:
     clauses: list[str] = ["peak_probability >= ?"]
     params: list = [min_prob]
@@ -51,7 +61,7 @@ def list_events(
         clauses.append("start <= ?")
         params.append(t1)
     where_sql = "WHERE " + " AND ".join(clauses) if clauses else ""
-    return _query_events(where_sql, params)
+    return _query_events(where_sql, params, limit)
 
 
 @router.get("/summary")
@@ -61,8 +71,20 @@ def events_summary() -> dict:
         return {"total": 0, "by_station": {}}
     con = duckdb.connect()
     try:
+        # Dedupe across event-parquet versions (v2 + v3 overlap on a few days)
+        # using the same (sta, sat, start) key as the listing endpoint.
         df = con.execute(
-            f"SELECT sta, COUNT(*) AS n FROM parquet_scan('{EVENT_GLOB}') GROUP BY sta"
+            f"""
+            WITH deduped AS (
+                SELECT sta, sat, start
+                FROM parquet_scan('{EVENT_GLOB}')
+                QUALIFY ROW_NUMBER() OVER (
+                    PARTITION BY sta, sat, start
+                    ORDER BY peak_probability DESC
+                ) = 1
+            )
+            SELECT sta, COUNT(*) AS n FROM deduped GROUP BY sta
+            """
         ).df()
         return {
             "total": int(df["n"].sum()),
