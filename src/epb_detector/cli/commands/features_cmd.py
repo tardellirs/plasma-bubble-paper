@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +14,12 @@ from rich.progress import track
 from epb_detector.config import SETTINGS
 from epb_detector.features import pipeline
 from epb_detector.ingest import cache
+
+
+def _build_one(args: tuple[Path, str, int, int]) -> pd.DataFrame:
+    """Process-pool worker: builds features for one station-day. Picklable."""
+    station_dir, sta, year, doy = args
+    return pipeline.build_for_station_day(station_dir, sta, year, doy)
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -46,15 +54,41 @@ def _station_day_dirs() -> list[tuple[Path, str, int, int]]:
 def build(
     version: str = "v0",
     out_path: Path = typer.Option(None, "--out", help="Override output parquet path."),
+    workers: int = typer.Option(
+        int(os.environ.get("EPB_FEATURES_WORKERS", "0")),
+        help=(
+            "Parallel worker count (0 = auto: min(8, CPU count)). "
+            "Each station-day is processed independently and the partial "
+            "frames are concatenated at the end. Same output as serial."
+        ),
+    ),
 ) -> None:
     """Build features for every successfully ingested station-day."""
-    parts: list[pd.DataFrame] = []
-    for station_dir, sta, year, doy in track(_station_day_dirs(), description="features"):
-        df = pipeline.build_for_station_day(station_dir, sta, year, doy)
-        if not df.empty:
-            parts.append(df)
-    if not parts:
+    jobs = _station_day_dirs()
+    if not jobs:
         rprint("[red]No features produced — is OUTPUT/ populated?[/red]")
+        raise typer.Exit(code=1)
+
+    n_workers = workers or min(8, (os.cpu_count() or 4))
+    parts: list[pd.DataFrame] = []
+    if n_workers <= 1:
+        for station_dir, sta, year, doy in track(jobs, description="features"):
+            df = pipeline.build_for_station_day(station_dir, sta, year, doy)
+            if not df.empty:
+                parts.append(df)
+    else:
+        rprint(f"[bold]features build[/] · {len(jobs)} station-days · {n_workers} workers")
+        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+            futures = {pool.submit(_build_one, j): j for j in jobs}
+            for done, fut in enumerate(as_completed(futures), start=1):
+                if done % 50 == 0 or done == len(jobs):
+                    rprint(f"  features: {done}/{len(jobs)}")
+                df = fut.result()
+                if not df.empty:
+                    parts.append(df)
+
+    if not parts:
+        rprint("[red]No features produced — every station-day returned empty.[/red]")
         raise typer.Exit(code=1)
     feats = pd.concat(parts, ignore_index=True)
     out = out_path or (SETTINGS.paths.data_processed / f"features_{version}.parquet")
