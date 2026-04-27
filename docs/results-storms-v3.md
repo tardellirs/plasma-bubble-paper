@@ -6,15 +6,30 @@
 
 ## Executive summary
 
-- **EPB rate during intense (|Dst| ≥ 100 nT) storms vs quiet baseline:**
-  0.84× (95% CI [0.49, 1.28], n=31 storms / 1244 quiet groups).
-- **Storms with Dst-min in the PRE window (17–22 LT, Brazilian sector)
-  amplify the EPB rate by an additional 0.46×** vs storms
-  whose Dst-min lands at other LTs. One-sided Mann-Whitney
-  *p* = 0.663.
-- **Solar-cycle modulation:** see Q6 below.
+- **Solar-cycle modulation is the dominant signal.** EPB-positive rate
+  scales monotonically with F10.7 phase quartile across the 31 intense+
+  storms in the v3 sample: 0.0077 → 0.0134 → 0.0220 → **0.0350** —
+  a **4.5× increase from solar minimum to solar maximum quartile**.
+  This is the *positive* finding of the storms-v3 work and is consistent
+  with the classical EUV-driven F-region instability picture (Aarons
+  1991; Abdu 2012).
+- **Storm-vs-quiet amplification is null on this sample.** Storm rate
+  0.043 vs quiet 0.051, ratio **0.84× (95% CI [0.49, 1.28])**. The
+  quiet baseline at solar maximum is already saturated with EPBs, so
+  there is no headroom for storms to "boost" the rate over the cycle-
+  averaged baseline that Q1 measures. Stratifying by cycle phase first
+  (Q6) and *then* asking the storm question is the correct next step.
+- **PRE-window amplification is null.** Storms with Dst-min in the
+  PRE window vs other LTs: Mann-Whitney one-sided *p* = 0.663.
+  Dst-min LT is too coarse a proxy for whether the PRE actually fired
+  on a given storm (n=7 in PRE bin caps the test power regardless).
+- **Independent recall on literature events: 5/5 evaluable events,
+  10/11 (station, event) pairs** — including a 2017-09-08 storm
+  (solar max conditions never seen in the model's 8-month training).
+  See [`data/case_study_validation_v3.json`](../data/case_study_validation_v3.json).
 - The full analysis JSON used to produce this report:
-  [`data/processed/analysis_v3.json`](../data/processed/analysis_v3.json).
+  [`data/processed/analysis_v3.json`](../data/processed/analysis_v3.json) ·
+  companion: [`docs/storms-v3-stats.json`](storms-v3-stats.json).
 
 ## Storm catalog
 
@@ -119,18 +134,29 @@ between **SALU** and **BRAZ**:
 ## Honest caveats
 
 - Pi/Cherniak heuristic still drives the labels — the model output
-  isn't an independent ground truth. Active learning (Phase 4 of the
-  original plan) is the next gap to close.
-- 11-year window contains only 31 intense+ storms. PRE-bin
-  events are the most physics-relevant, but the smallest sub-sample;
-  treat the LT-stratified result as suggestive until it's reproduced
-  on a longer baseline (cycle 23 max).
+  isn't an independent ground truth. The case-study validation
+  (5/5 events recovered) is the meaningful generalization metric.
+  Active learning is the next gap to close.
+- The v3 ingest captured **31 intense+ storms with GNSS data**, not the
+  full 186 detected in the 11-yr Dst record. The 4-bin LT stratification
+  has only 6–10 storms per bin, which is why Q2 reads as null even
+  though the *direction* (PRE-adjacent < non-PRE) is the opposite of
+  the hypothesis. Treat Q2 as suggestive of *no effect at this sample
+  size*, not as a refutation of the PRE hypothesis itself.
+- Q5 (pre-storm baseline drift) returned NaN — the
+  `hours_from_dst_min` column on labels v3 has gaps for some storms;
+  the metric is reported but not interpretable on this snapshot.
+- The pre-registered Phase 2-A finding (`main > recovery`) does NOT
+  survive on v3 — null result reported honestly.
 - Brazilian-sector LT bin is computed from a constant longitude offset
   (-45°). For storms whose Dst-min hits at a high-cadence Dst sample
   this is fine; near the boundary times (17 / 22 LT) a 1-h Dst grid
   may shift a storm into the wrong bin.
-- Solar-cycle phase confound is partly absorbed by the matched-quiet
-  control day selection.
+- Q6 (solar-cycle modulation) is the strongest signal but the dataset
+  is dominated by 2024 cycle-25 max and lacks cycle-23 max coverage —
+  a longer baseline would test whether the trend is monotonic across
+  cycles or specific to the descending-cycle-24 / ascending-cycle-25
+  geometry the v3 sample captured.
 
 ## Reproduce
 
