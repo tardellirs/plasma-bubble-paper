@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from functools import lru_cache
 
 import duckdb
 from fastapi import APIRouter, Query
@@ -12,6 +13,73 @@ from epb_detector.config import SETTINGS
 router = APIRouter(prefix="/events", tags=["events"])
 
 EVENT_GLOB = SETTINGS.paths.data_processed / "events" / "*.parquet"
+
+ROTI_ROOT = SETTINGS.paths.pyoasis_output / "RINEX"
+
+
+@lru_cache(maxsize=1)
+def _roti_station_days_cached(_mtime_key: float) -> set[tuple[str, int, int]]:
+    """Return the set of (sta, year, doy) for which a ROTI.txt file exists.
+
+    The map's event drawer reads raw per-sample ROTI from
+    ``OUTPUT/RINEX/<year>/<doy>/<sta>/<sta>_<doy>_<year>_{G,R}_ROTI.txt``.
+    Storm-stratified ingest produced predictions for years 2014–2025 but
+    only 2023–2024 OUTPUT was synced back to this host, so events
+    outside that range come back with 'No raw ROTI file on disk'. We
+    pre-compute the available set once and filter /events against it.
+
+    Cache key is the OUTPUT/RINEX root mtime — invalidates whenever a
+    new station-day is rsynced in.
+    """
+    available: set[tuple[str, int, int]] = set()
+    if not ROTI_ROOT.exists():
+        return available
+    for year_dir in ROTI_ROOT.iterdir():
+        if not year_dir.is_dir() or not year_dir.name.isdigit():
+            continue
+        year = int(year_dir.name)
+        for doy_dir in year_dir.iterdir():
+            if not doy_dir.is_dir() or not doy_dir.name.isdigit():
+                continue
+            doy = int(doy_dir.name)
+            for sta_dir in doy_dir.iterdir():
+                if not sta_dir.is_dir():
+                    continue
+                sta = sta_dir.name.upper()
+                # Has at least one of GPS / GLONASS ROTI on disk.
+                if any(
+                    (sta_dir / f"{sta}_{doy:03d}_{year}_{sys}_ROTI.txt").exists()
+                    for sys in ("G", "R")
+                ):
+                    available.add((sta, year, doy))
+    return available
+
+
+def _roti_station_days() -> set[tuple[str, int, int]]:
+    if not ROTI_ROOT.exists():
+        return set()
+    # Use the directory mtime as the cache key — rsync of new years/doys
+    # bumps it.
+    return _roti_station_days_cached(ROTI_ROOT.stat().st_mtime)
+
+
+def _filter_to_roti_days(rows: list[dict]) -> list[dict]:
+    """Drop events whose (sta, year, doy) has no ROTI .txt on disk."""
+    available = _roti_station_days()
+    if not available:
+        return rows
+    out: list[dict] = []
+    for r in rows:
+        start = r.get("start")
+        sta = (r.get("sta") or "").upper()
+        if start is None or not sta:
+            continue
+        # `start` arrives as pandas Timestamp from DuckDB.df().
+        ts = start if hasattr(start, "year") else datetime.fromisoformat(str(start))
+        key = (sta, ts.year, ts.timetuple().tm_yday)
+        if key in available:
+            out.append(r)
+    return out
 
 
 def _query_events(where_sql: str, params: list, limit: int) -> list[dict]:
@@ -48,6 +116,14 @@ def list_events(
     t1: datetime | None = Query(default=None, description="Latest event start (UTC)"),
     min_prob: float = Query(default=0.5, ge=0.0, le=1.0),
     limit: int = Query(default=50_000, ge=1, le=200_000),
+    roti_only: bool = Query(
+        default=True,
+        description=(
+            "Only return events whose station-day has a raw ROTI.txt on "
+            "disk. Defaults true so the map drawer's per-sample chart "
+            "always has data; pass false to see all model predictions."
+        ),
+    ),
 ) -> list[dict]:
     clauses: list[str] = ["peak_probability >= ?"]
     params: list = [min_prob]
@@ -61,37 +137,42 @@ def list_events(
         clauses.append("start <= ?")
         params.append(t1)
     where_sql = "WHERE " + " AND ".join(clauses) if clauses else ""
-    return _query_events(where_sql, params, limit)
+    rows = _query_events(where_sql, params, limit)
+    if roti_only:
+        rows = _filter_to_roti_days(rows)
+    return rows
 
 
 @router.get("/summary")
-def events_summary() -> dict:
-    """Aggregate counts useful for the homepage hero."""
+def events_summary(roti_only: bool = Query(default=True)) -> dict:
+    """Aggregate counts useful for the homepage hero.
+
+    Mirrors /events defaults: dedupes across v2/v3 parquets and (by
+    default) only counts events whose station-day has a raw ROTI on
+    disk so the home-page total matches what the map actually plots.
+    """
     if not list(EVENT_GLOB.parent.glob("*.parquet")):
         return {"total": 0, "by_station": {}}
     con = duckdb.connect()
     try:
-        # Dedupe across event-parquet versions (v2 + v3 overlap on a few days)
-        # using the same (sta, sat, start) key as the listing endpoint.
-        df = con.execute(
+        rows = con.execute(
             f"""
-            WITH deduped AS (
-                SELECT sta, sat, start
-                FROM parquet_scan('{EVENT_GLOB}')
-                QUALIFY ROW_NUMBER() OVER (
-                    PARTITION BY sta, sat, start
-                    ORDER BY peak_probability DESC
-                ) = 1
-            )
-            SELECT sta, COUNT(*) AS n FROM deduped GROUP BY sta
+            SELECT sta, sat, start, peak_probability
+            FROM parquet_scan('{EVENT_GLOB}')
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY sta, sat, start
+                ORDER BY peak_probability DESC
+            ) = 1
             """
-        ).df()
-        return {
-            "total": int(df["n"].sum()),
-            "by_station": dict(zip(df["sta"], df["n"].astype(int), strict=False)),
-        }
+        ).df().to_dict(orient="records")
     finally:
         con.close()
+    if roti_only:
+        rows = _filter_to_roti_days(rows)
+    by_sta: dict[str, int] = {}
+    for r in rows:
+        by_sta[r["sta"]] = by_sta.get(r["sta"], 0) + 1
+    return {"total": sum(by_sta.values()), "by_station": by_sta}
 
 
 _PRED_PATTERN = SETTINGS.paths.data_processed / "predictions_v*.parquet"
