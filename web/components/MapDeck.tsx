@@ -67,27 +67,31 @@ export default function MapDeck({ events, stations }: Props) {
   const [hover, setHover] = useState<EventRow | null>(null);
   const [selected, setSelected] = useState<EventRow | null>(null);
 
-  // Time slider over the event range, snapped to UTC midnight day boundaries.
-  // Plain reduce loop — Math.min(...xs) / Math.max(...xs) on 15k+ items
-  // hits V8's argument-spread limit and returns NaN, which silently
-  // collapses every event out of the cursor-overlap filter.
-  const { tMin, tMax } = useMemo(() => {
-    if (events.length === 0)
-      return { tMin: Date.now() - DAY_MS, tMax: Date.now() };
-    let lo = Infinity;
-    let hi = -Infinity;
+  // Compute the sorted list of UTC midnights that actually have events,
+  // plus a per-day count. The slider snaps to entries in this list
+  // (instead of every UTC midnight in the span) so every cursor
+  // position shows something — the v3 ingest is sparse storm-window
+  // coverage across 11 years and only ~7% of days have events.
+  const dayList = useMemo(() => {
+    const counts = new Map<number, number>();
     for (const e of events) {
-      const t = +new Date(e.start);
-      if (t < lo) lo = t;
-      if (t > hi) hi = t;
+      const m = utcMidnight(+new Date(e.start));
+      counts.set(m, (counts.get(m) ?? 0) + 1);
     }
-    return { tMin: utcMidnight(lo), tMax: utcMidnight(hi) };
+    return [...counts.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([t, n]) => ({ t, n }));
   }, [events]);
-  const [tCursor, setTCursor] = useState<number>(tMax);
 
+  const [dayIdx, setDayIdx] = useState<number>(
+    dayList.length > 0 ? dayList.length - 1 : 0,
+  );
+  // Snap back to the last day whenever the dataset reshapes.
   useEffect(() => {
-    setTCursor(tMax);
-  }, [tMax]);
+    if (dayList.length > 0) setDayIdx(dayList.length - 1);
+  }, [dayList]);
+  const tCursor = dayList[dayIdx]?.t ?? Date.now() - DAY_MS;
+  const eventsOnDay = dayList[dayIdx]?.n ?? 0;
 
   useEffect(() => {
     if (!ref.current) return;
@@ -312,11 +316,13 @@ export default function MapDeck({ events, stations }: Props) {
             Equatorial Plasma Bubble Map
           </div>
           <div className="font-display text-lg mt-1">
-            {events.length.toLocaleString()} events · {stations.length} stations
+            {events.length.toLocaleString()} events ·{" "}
+            {dayList.length.toLocaleString()} days · {stations.length}{" "}
+            stations
           </div>
           <div className="text-xs text-[var(--fg-muted)] mt-1">
             Color: detection probability. Click an event to open its time
-            series.
+            series. Slider snaps to days with detections.
           </div>
         </div>
 
@@ -341,20 +347,24 @@ export default function MapDeck({ events, stations }: Props) {
           <div className="flex items-center justify-between text-xs text-[var(--fg-muted)] mb-2">
             <span className="font-mono">
               {new Date(tCursor).toISOString().slice(0, 10)} UTC
-              <span className="ml-2 opacity-70">(24h window)</span>
+              <span className="ml-2 opacity-70">
+                · {eventsOnDay.toLocaleString()} events on this day
+              </span>
             </span>
             <span>
-              <span className="kbd">←</span> day  ·  <span className="kbd">→</span> day
+              <span className="kbd">←</span> prev day ·{" "}
+              <span className="kbd">→</span> next day · {dayIdx + 1} /{" "}
+              {dayList.length}
             </span>
           </div>
           <input
             aria-label="Day cursor"
             type="range"
-            min={tMin}
-            max={tMax}
-            step={DAY_MS}
-            value={tCursor}
-            onChange={(e) => setTCursor(Number(e.target.value))}
+            min={0}
+            max={Math.max(0, dayList.length - 1)}
+            step={1}
+            value={dayIdx}
+            onChange={(e) => setDayIdx(Number(e.target.value))}
             className="w-full accent-[var(--accent)]"
             data-testid="time-slider"
           />
