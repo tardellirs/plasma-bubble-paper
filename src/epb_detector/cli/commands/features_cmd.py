@@ -55,11 +55,12 @@ def build(
     version: str = "v0",
     out_path: Path = typer.Option(None, "--out", help="Override output parquet path."),
     workers: int = typer.Option(
-        int(os.environ.get("EPB_FEATURES_WORKERS", "0")),
+        0,
+        "--workers",
         help=(
-            "Parallel worker count (0 = auto: min(8, CPU count)). "
-            "Each station-day is processed independently and the partial "
-            "frames are concatenated at the end. Same output as serial."
+            "Parallel worker count (0 = auto: min(8, CPU count) or "
+            "EPB_FEATURES_WORKERS env). Each station-day is processed "
+            "independently and the partial frames are concatenated at the end."
         ),
     ),
 ) -> None:
@@ -69,7 +70,11 @@ def build(
         rprint("[red]No features produced — is OUTPUT/ populated?[/red]")
         raise typer.Exit(code=1)
 
-    n_workers = workers or min(8, (os.cpu_count() or 4))
+    # When called from run_all (Python function call, not CLI), `workers`
+    # may be a typer.OptionInfo instead of an int — coerce.
+    if not isinstance(workers, int):
+        workers = 0
+    n_workers = workers or int(os.environ.get("EPB_FEATURES_WORKERS", "0")) or min(8, (os.cpu_count() or 4))
     parts: list[pd.DataFrame] = []
     if n_workers <= 1:
         for station_dir, sta, year, doy in track(jobs, description="features"):
