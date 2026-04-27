@@ -68,14 +68,20 @@ export default function MapDeck({ events, stations }: Props) {
   const [selected, setSelected] = useState<EventRow | null>(null);
 
   // Time slider over the event range, snapped to UTC midnight day boundaries.
+  // Plain reduce loop — Math.min(...xs) / Math.max(...xs) on 15k+ items
+  // hits V8's argument-spread limit and returns NaN, which silently
+  // collapses every event out of the cursor-overlap filter.
   const { tMin, tMax } = useMemo(() => {
     if (events.length === 0)
       return { tMin: Date.now() - DAY_MS, tMax: Date.now() };
-    const xs = events.map((e) => +new Date(e.start));
-    return {
-      tMin: utcMidnight(Math.min(...xs)),
-      tMax: utcMidnight(Math.max(...xs)),
-    };
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const e of events) {
+      const t = +new Date(e.start);
+      if (t < lo) lo = t;
+      if (t > hi) hi = t;
+    }
+    return { tMin: utcMidnight(lo), tMax: utcMidnight(hi) };
   }, [events]);
   const [tCursor, setTCursor] = useState<number>(tMax);
 
