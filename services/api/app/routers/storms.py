@@ -241,10 +241,10 @@ def _v3_solar_cycle_payload(
     # Monthly mean SSN — 132 points for 11 years instead of 4498 daily rows.
     sw_month = (
         sw.dropna(subset=["SN"])
-        .assign(_m=sw["date"].dt.to_period("M").dt.to_timestamp(tz="UTC"))
-        .groupby("_m", as_index=False)["SN"]
+        .groupby(pd.Grouper(key="date", freq="MS"))["SN"]
         .mean()
-        .rename(columns={"_m": "date"})
+        .reset_index()
+        .dropna(subset=["SN"])
     )
     ssn_rows = [
         {"date": pd.Timestamp(r["date"]).isoformat(), "ssn": float(r["SN"])}
