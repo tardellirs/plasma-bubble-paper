@@ -1,0 +1,212 @@
+{
+  "model_id": "xgb_v0.3.0",
+  "snapshot_id": "v3",
+  "events_total": 7,
+  "events_evaluable": 5,
+  "events_recovered": 5,
+  "station_event_pairs_total": 11,
+  "station_event_pairs_recovered": 10,
+  "events": [
+    {
+      "date": "2015-12-25",
+      "reference": "Pican\u00e7o et al., 2022, J. Atmos. Sol.-Terr. Phys., 232",
+      "doi": "10.1016/j.jastp.2022.105873",
+      "stations": [
+        "SALU",
+        "BOAV",
+        "BELE"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BELE": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        }
+      }
+    },
+    {
+      "date": "2014-10-08",
+      "reference": "Muella et al., 2017, Adv. Space Res., 60",
+      "doi": "10.1016/j.asr.2017.05.025",
+      "stations": [
+        "SALU",
+        "BRAZ",
+        "BOAV"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BRAZ": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        }
+      }
+    },
+    {
+      "date": "2017-09-08",
+      "reference": "Spogli et al., 2021, Space Weather, 19",
+      "doi": "10.1029/2020SW002632",
+      "stations": [
+        "SALU",
+        "BRAZ",
+        "BOAV",
+        "POAL"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 40
+        },
+        "BRAZ": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 119
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "POAL": {
+          "status": "miss",
+          "max_prob": 0.0,
+          "n_windows": 0
+        }
+      }
+    },
+    {
+      "date": "2024-05-10",
+      "reference": "Tsurutani et al., 2024 (Mother's Day Storm reports)",
+      "doi": "10.1029/2024SW004031",
+      "stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ",
+        "MAPA",
+        "BELE"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 1725
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BRAZ": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 1840
+        },
+        "MAPA": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BELE": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 1683
+        }
+      }
+    },
+    {
+      "date": "2024-05-11",
+      "reference": "Tsurutani et al., 2024",
+      "doi": "10.1029/2024SW004031",
+      "stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "hit",
+          "max_prob": 0.9986577033996582,
+          "n_windows": 1717
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BRAZ": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 1802
+        }
+      }
+    },
+    {
+      "date": "2023-11-05",
+      "reference": "INPE EMBRACE bulletin, Nov 2023",
+      "doi": "",
+      "stations": [
+        "SALU",
+        "BOAV"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 1742
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        }
+      }
+    },
+    {
+      "date": "2023-12-01",
+      "reference": "INPE EMBRACE bulletin, Dec 2023",
+      "doi": "",
+      "stations": [
+        "SALU",
+        "BOAV",
+        "BRAZ"
+      ],
+      "hits": {
+        "SALU": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 406
+        },
+        "BOAV": {
+          "status": "no_data",
+          "max_prob": null,
+          "n_windows": 0
+        },
+        "BRAZ": {
+          "status": "hit",
+          "max_prob": 1.0,
+          "n_windows": 287
+        }
+      }
+    }
+  ]
+}
