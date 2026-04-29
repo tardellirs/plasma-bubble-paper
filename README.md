@@ -20,6 +20,7 @@ Built around the [pyOASIS](https://github.com/giorgiopicanco/OASIS) ionospheric 
 - [Features](#features)
 - [Architecture](#architecture)
 - [Pipeline](#pipeline)
+- [Data](#data)
 - [Project layout](#project-layout)
 - [Quick start](#quick-start)
 - [Installation](#installation)
@@ -128,6 +129,63 @@ data/cache/manifest.parquet                  # which (sta, year, doy) are done/f
 ```
 
 Routers and scripts use a **latest-version glob** pattern, so adding a new `vN` is picked up automatically.
+
+## Data
+
+### Sources
+
+| Source | Provider | Cadence | Used for |
+|---|---|---|---|
+| **RBMC RINEX 3** | [IBGE](https://www.ibge.gov.br/geociencias/informacoes-sobre-posicionamento-geodesico/rede-geodesica/16327-rede-brasileira-de-monitoramento-continuo-dos-sistemas-gnss-rbmc.html) (Rede Brasileira de Monitoramento Contínuo) | 1 file / station / day, 15 s sampling | GNSS observations (carrier phase + pseudorange, GPS + GLONASS) |
+| **MGEX SP3** precise orbits | [GFZ](https://igs.org/mgex/) and [JAXA](https://igs.org/mgex/) (IGS Multi-GNSS Experiment) | 1 file / day, 5-min epochs | Satellite ECEF positions for IPP geometry |
+| **Kp / ap geomagnetic indices** | [GFZ Potsdam](https://kp.gfz.de/) | 3-hourly | Storm phase tagging, model feature |
+| **Dst index** | [WDC Kyoto](https://wdc.kugi.kyoto-u.ac.jp/dstdir/) | hourly | Storm phase tagging (`hours_from_dst_min`), model feature |
+| **F10.7 solar flux** | [LISIRD / NOAA](https://lasp.colorado.edu/lisird/data/penticton_radio_flux/) | daily | Long-term solar activity context, model feature |
+| **Case-study events** | Curated YAML compiled from peer-reviewed Brazilian ionospheric literature | — | Independent validation (`src/epb_detector/external/case_studies.yaml`) |
+
+All raw RINEX is fetched on-demand by `epb ingest` and cached under `data/INPUT/`; processed indices land in `data/OUTPUT/<year>/<doy>/<station>/`.
+
+### Stations (Phase 2-A queue)
+
+8 RBMC stations were targeted, spanning the magnetic equator, the EIA crest, and a mid-latitude control:
+
+| Station | Location | Region | QD-Lat | Status |
+|---|---|---|---:|---|
+| **BOAV** | Boa Vista (RR) | magnetic-equator | +3°N | partially ingested (`--skip BOAV` flag added mid-run) |
+| **SALU** | São Luís (MA) | magnetic-equator | −2°S | full coverage |
+| **BELE** | Belém (PA) | magnetic-equator | −1°S | mostly complete |
+| **MAPA** | Macapá (AP) | magnetic-equator | — | RINEX absent in IBGE archive |
+| **PALM** | Palmas (TO) | EIA-crest-south | — | RINEX absent in IBGE archive |
+| **BRAZ** | Brasília (DF) | EIA-crest-south | −16°S | full coverage |
+| **UFPR** | Curitiba (PR) | mid-latitude | −22°S | partial |
+| **POAL** | Porto Alegre (RS) | mid-latitude | −30°S | full coverage; mid-latitude control (no EPBs expected) |
+
+The full catalogue (geodetic + ECEF coordinates, operator, MVP flag) lives in [`src/epb_detector/catalog/stations_rbmc.yaml`](src/epb_detector/catalog/stations_rbmc.yaml).
+
+### Time window and volume
+
+- **Window:** 2 September 2023 – 14 May 2024 (~77 days)
+- **Targeted station-days:** 539 (8 stations × ~77 days)
+- **Successfully ingested:** **400** (74 % of queue)
+- **Failed:** 181 — almost all MAPA (77/77) and PALM (77/77); IBGE has no RINEX for those station-days, not a pipeline bug
+- **Raw OUTPUT volume:** ~49 GB delta after the Hetzner burst (rsynced to Hostinger production volume)
+
+### Derived datasets
+
+After pyOASIS produces ROTI / ΔTEC / SIDX / TEC, the `epb_detector` layer materialises a versioned chain of parquet artefacts (snapshot **`v2`**):
+
+| Artefact | Rows / size | Notes |
+|---|---|---|
+| `features_v2.parquet` | **1,680,317** rows × **23** columns | 10-min sliding windows; ROTI / ΔTEC / SIDX statistics, geometric (elevation, IPP lon/lat, QD-lat, local time), space-weather context (`dst`, `kp`, `ap`, `F107obs`, `hours_from_dst_min`) |
+| `labels_v2.parquet` | 1,680,317 rows | **82,931 positive** (4.94 %) under the storm-aware Pi 1997 + Cherniak 2014 heuristic |
+| `predictions_v2.parquet` | 1,680,317 rows | Per-window probability from `xgb_v0.3.0` |
+| `events/events_v2.parquet` | **6,250** events | Contiguous-positive merge served by `/events` |
+| `training_snapshots/v2/` | train / val / test parquet + `dataset_card.md` | `GroupKFold` by `(station, day-of-year)`; test fold = 335,969 windows, 15,438 positives |
+| `case_study_validation_v2.json` | 7 case-study entries | **6/6 stations, 3/3 evaluable events** flagged independently |
+
+The pipeline emits `data/cache/manifest.parquet` so re-running `epb ingest` is idempotent at station-day granularity.
+
+Snapshots `v0` and `v1` ship with the repo as references — see [`data/training_snapshots/v1/dataset_card.md`](data/training_snapshots/v1/dataset_card.md) for the full schema (column types, units, hashing, train/val/test SHA). The production `v2` snapshot lives on the shared data volume and is downloadable via the API: [`/training-data/snapshots/v2/download`](https://plasma-bubble.ifsp.dev/api/training-data/snapshots/v2/download). The full Phase 2-A scientific report is [`docs/results-phase2a.md`](docs/results-phase2a.md).
 
 ## Project layout
 
