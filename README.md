@@ -162,12 +162,17 @@ All raw RINEX is fetched on-demand by `epb ingest` and cached under `data/INPUT/
 
 The full catalogue (geodetic + ECEF coordinates, operator, MVP flag) lives in [`src/epb_detector/catalog/stations_rbmc.yaml`](src/epb_detector/catalog/stations_rbmc.yaml).
 
-### Time window and volume
+### Time windows and volume
 
-- **Window:** 2 September 2023 – 14 May 2024 (~77 days)
-- **Targeted station-days:** 539 (8 stations × ~77 days)
-- **Successfully ingested:** **400** (74 % of queue)
-- **Failed:** 181 — almost all MAPA (77/77) and PALM (77/77); IBGE has no RINEX for those station-days, not a pipeline bug
+The project has **two stacked windows**, each suited to a different question:
+
+| Window | Purpose | Span | What was ingested |
+|---|---|---|---|
+| **Phase 2-A** (model training) | Train and calibrate `xgb_v0.3.0` on a contiguous, mixed-activity slice | 2 Sep 2023 – 14 May 2024 (~77 days) | 539 targeted station-days → **400 ingested**, 181 failed (MAPA / PALM RINEX absent in the IBGE archive) |
+| **storms-v3** (storm-stratified analysis) | Test storm/quiet, LT, and solar-cycle hypotheses across cycle 24 + 25 | Jan 2014 – Dec 2024 (11 yr) | Dst catalog: **195 storms** (156 intense + 28 severe + 9 moderate + 2 super). GNSS ingested for **31 intense+ storms** that overlap available RBMC days — **not all 195**. |
+
+So: space-weather indices (Kp / ap / Dst / F10.7) are continuous over the 11-year window, but RBMC RINEX was only ingested where storms had at least one usable RBMC station-day. The storms-v3 sample reads "31 intense+ storms with GNSS data, drawn from a population of 195 in the Dst record."
+
 - **Raw OUTPUT volume:** ~49 GB delta after the Hetzner burst (rsynced to Hostinger production volume)
 
 ### Derived datasets
