@@ -638,15 +638,6 @@ python paper/scripts/make_fig12_storm_vs_quiet_v3.py
 python paper/scripts/make_fig13_storm_lt_polar.py
 # ... fig14-19 follow the same pattern`}
         </pre>
-        <h2 className="mt-6 font-display text-xl font-semibold">Cite</h2>
-        <pre className="mt-3 bg-black/40 p-3 text-xs overflow-auto">
-{`@article{plasmabubble2026,
-  title  = {Storm-stratified Equatorial Plasma Bubble detection over Brazil},
-  author = {Tardelli, R. and Picanço, G. and others},
-  year   = {2026},
-  note   = {in prep.}
-}`}
-        </pre>
         <a
           className="mt-4 inline-block text-sm text-[var(--accent)] underline"
           href="https://github.com/tardellirs/plasma-bubble-paper/blob/main/docs/results-storms-v3.md"

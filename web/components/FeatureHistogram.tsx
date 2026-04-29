@@ -39,6 +39,8 @@ export function FeatureHistogram({
   const [feature, setFeature] = useState("roti_max");
   const [data, setData] = useState<DistributionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"density" | "count">("density");
+  const [yScale, setYScale] = useState<"linear" | "log">("linear");
 
   useEffect(() => {
     let cancelled = false;
@@ -60,13 +62,36 @@ export function FeatureHistogram({
     };
   }, [feature, snapshotId]);
 
+  const posTotal = data ? data.positive.reduce((a, b) => a + b, 0) : 0;
+  const negTotal = data ? data.negative.reduce((a, b) => a + b, 0) : 0;
+
   const chartData = data
-    ? data.bins.slice(0, -1).map((edge, i) => ({
-        bin: ((edge + (data.bins[i + 1] ?? edge)) / 2).toFixed(2),
-        positive: data.positive[i] ?? 0,
-        negative: data.negative[i] ?? 0,
-      }))
+    ? data.bins.slice(0, -1).map((edge, i) => {
+        const pos = data.positive[i] ?? 0;
+        const neg = data.negative[i] ?? 0;
+        return {
+          bin: ((edge + (data.bins[i + 1] ?? edge)) / 2).toFixed(2),
+          positive:
+            mode === "density"
+              ? posTotal > 0
+                ? (pos / posTotal) * 100
+                : 0
+              : pos,
+          negative:
+            mode === "density"
+              ? negTotal > 0
+                ? (neg / negTotal) * 100
+                : 0
+              : neg,
+        };
+      })
     : [];
+
+  const yLabel = mode === "density" ? "% of class" : "count";
+  const yTickFormatter = (v: number) =>
+    mode === "density" ? `${v.toFixed(1)}%` : v.toLocaleString();
+  const tooltipFormatter = (value: number) =>
+    mode === "density" ? `${value.toFixed(2)}%` : value.toLocaleString();
 
   return (
     <div className="card p-5">
@@ -77,19 +102,47 @@ export function FeatureHistogram({
           </div>
           <div className="mt-1 font-display text-lg">{feature}</div>
         </div>
-        <select
-          aria-label="Feature"
-          className="bg-transparent border border-[#1c2236] rounded px-2 py-1 text-sm font-mono"
-          value={feature}
-          onChange={(e) => setFeature(e.target.value)}
-          data-testid="feature-select"
-        >
-          {FEATURE_OPTIONS.map((f) => (
-            <option key={f} value={f} className="bg-[var(--bg-soft)]">
-              {f}
+        <div className="flex items-center gap-2">
+          <select
+            aria-label="Y mode"
+            className="bg-transparent border border-[#1c2236] rounded px-2 py-1 text-xs font-mono"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as "density" | "count")}
+          >
+            <option value="density" className="bg-[var(--bg-soft)]">
+              density
             </option>
-          ))}
-        </select>
+            <option value="count" className="bg-[var(--bg-soft)]">
+              count
+            </option>
+          </select>
+          <select
+            aria-label="Y scale"
+            className="bg-transparent border border-[#1c2236] rounded px-2 py-1 text-xs font-mono"
+            value={yScale}
+            onChange={(e) => setYScale(e.target.value as "linear" | "log")}
+          >
+            <option value="linear" className="bg-[var(--bg-soft)]">
+              linear
+            </option>
+            <option value="log" className="bg-[var(--bg-soft)]">
+              log
+            </option>
+          </select>
+          <select
+            aria-label="Feature"
+            className="bg-transparent border border-[#1c2236] rounded px-2 py-1 text-sm font-mono"
+            value={feature}
+            onChange={(e) => setFeature(e.target.value)}
+            data-testid="feature-select"
+          >
+            {FEATURE_OPTIONS.map((f) => (
+              <option key={f} value={f} className="bg-[var(--bg-soft)]">
+                {f}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="h-72">
         {error && (
@@ -99,9 +152,37 @@ export function FeatureHistogram({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1c2236" />
-              <XAxis dataKey="bin" stroke="#8c93a8" fontSize={10} />
-              <YAxis stroke="#8c93a8" fontSize={10} />
+              <XAxis
+                dataKey="bin"
+                stroke="#8c93a8"
+                fontSize={10}
+                label={{
+                  value: feature,
+                  position: "insideBottom",
+                  offset: -2,
+                  fill: "#8c93a8",
+                  fontSize: 10,
+                }}
+              />
+              <YAxis
+                stroke="#8c93a8"
+                fontSize={10}
+                scale={yScale === "log" ? "log" : "linear"}
+                domain={
+                  yScale === "log" ? [0.001, "auto"] : [0, "auto"]
+                }
+                allowDataOverflow
+                tickFormatter={yTickFormatter}
+                label={{
+                  value: yLabel,
+                  angle: -90,
+                  position: "insideLeft",
+                  fill: "#8c93a8",
+                  fontSize: 10,
+                }}
+              />
               <Tooltip
+                formatter={tooltipFormatter}
                 contentStyle={{
                   background: "#0e1320",
                   border: "1px solid #1c2236",
